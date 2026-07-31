@@ -18,7 +18,8 @@
         "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/CombatModelBlocker/latest.zip",
         "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/CombatModelBlocker/latest.zip",
         "LastUpdate":  "1785473206",
-        "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins"
+        "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
+        "IconUrl":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/assets/icons/CombatModelBlocker.png"
     },
     {
         "Author":  "QianyanSR",
@@ -40,7 +41,8 @@
         "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/CrescentMarkers/latest.zip",
         "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/CrescentMarkers/latest.zip",
         "LastUpdate":  "1785473206",
-        "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins"
+        "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
+        "IconUrl":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/assets/icons/CrescentMarkers.png"
     },
     {
         "Author":  "QianyanSR",
@@ -61,6 +63,7 @@
         "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/WhiteMageCureRedirect/latest.zip",
         "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/WhiteMageCureRedirect/latest.zip",
         "LastUpdate":  "1785473206",
-        "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins"
+        "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
+        "IconUrl":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/assets/icons/WhiteMageCureRedirect.png"
     }
 ]
