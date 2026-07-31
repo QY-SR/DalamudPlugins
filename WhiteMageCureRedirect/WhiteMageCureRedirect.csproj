@@ -1,0 +1,15 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <AssemblyName>WhiteMageCureRedirect</AssemblyName>
+    <RootNamespace>WhiteMageCureRedirect</RootNamespace>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <IsPackable>false</IsPackable>
+    <Authors>QianyanSR</Authors>
+    <RepositoryType>Git</RepositoryType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Plugin.cs" />
+  </ItemGroup>
+</Project>

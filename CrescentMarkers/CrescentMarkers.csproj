@@ -1,0 +1,11 @@
+﻿<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <AssemblyName>CrescentMarkers</AssemblyName>
+    <RootNamespace>CrescentMarkers</RootNamespace>
+    <AssemblyVersion>1.0.4.0</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <IsPackable>false</IsPackable>
+    <Authors>QianyanSR</Authors>
+    <RepositoryType>Git</RepositoryType>
+  </PropertyGroup>
+</Project>

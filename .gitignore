@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+*.user
+
+# ACT variants are intentionally excluded from this Dalamud repository.
+CrescentMarkersACT/
+CrescentMarkersACT-DevTools/
