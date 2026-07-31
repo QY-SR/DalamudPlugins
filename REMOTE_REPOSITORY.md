@@ -11,7 +11,7 @@
 在 Dalamud 设置的“实验性功能”中，将以下地址添加到自定义插件仓库：
 
 ```text
-https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/pluginmaster.json
+https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/pluginmaster.json
 ```
 
 保存设置并刷新插件列表后，即可搜索、安装和更新以上插件。
