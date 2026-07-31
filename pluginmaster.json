@@ -15,8 +15,8 @@
         "Punchline":  "在战斗中或常驻屏蔽非小队玩家模型。",
         "IsHide":  false,
         "IsTestingExclusive":  false,
-        "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins@main/plugins/CombatModelBlocker/latest.zip",
-        "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins@main/plugins/CombatModelBlocker/latest.zip",
+        "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/CombatModelBlocker/latest.zip",
+        "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/CombatModelBlocker/latest.zip",
         "LastUpdate":  "1785473206",
         "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins"
     },
@@ -37,8 +37,8 @@
         "Punchline":  "标记新月岛附近的宝箱和好运胡萝卜。",
         "IsHide":  false,
         "IsTestingExclusive":  false,
-        "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins@main/plugins/CrescentMarkers/latest.zip",
-        "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins@main/plugins/CrescentMarkers/latest.zip",
+        "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/CrescentMarkers/latest.zip",
+        "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/CrescentMarkers/latest.zip",
         "LastUpdate":  "1785473206",
         "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins"
     },
@@ -58,8 +58,8 @@
         "Punchline":  "白魔法师尚未解锁救疗时，将救疗重定向为治疗。",
         "IsHide":  false,
         "IsTestingExclusive":  false,
-        "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins@main/plugins/WhiteMageCureRedirect/latest.zip",
-        "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins@main/plugins/WhiteMageCureRedirect/latest.zip",
+        "DownloadLinkInstall":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/WhiteMageCureRedirect/latest.zip",
+        "DownloadLinkUpdate":  "https://cdn.jsdelivr.net/gh/QY-SR/DalamudPlugins/plugins/WhiteMageCureRedirect/latest.zip",
         "LastUpdate":  "1785473206",
         "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins"
     }
