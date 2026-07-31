@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Hooking;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Command;
@@ -12,6 +13,8 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using Lumina.Excel.Sheets;
 
 namespace CrescentMarkers;
 
@@ -22,7 +25,8 @@ public sealed class Plugin : IDalamudPlugin
     private const uint CarrotColor = 0xFF42A5FF;
     private const uint TextColor = 0xFFFFFFFF;
     private const uint ShadowColor = 0xE0000000;
-    private const float ChestRemovalDistance = 20f;
+    private const float ChestRemovalDistance = 50f;
+    private const uint LocalMapMarkerIconId = 60563;
     private const uint ChewedCarrotBaseId = 2010139;
     private static readonly TimeSpan ChestMissingGracePeriod = TimeSpan.FromMilliseconds(750);
     private static readonly TimeSpan AreaLoadGracePeriod = TimeSpan.FromSeconds(5);
@@ -38,6 +42,7 @@ public sealed class Plugin : IDalamudPlugin
         "胡萝卜", "萝卜", "carrot", "karotte", "carotte",
     ];
 
+
     [PluginService] private static IDalamudPluginInterface PluginInterface { get; set; } = null!;
     [PluginService] private static ICommandManager CommandManager { get; set; } = null!;
     [PluginService] private static IObjectTable ObjectTable { get; set; } = null!;
@@ -46,6 +51,8 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private static IChatGui ChatGui { get; set; } = null!;
     [PluginService] private static ISeStringEvaluator SeStringEvaluator { get; set; } = null!;
     [PluginService] private static IPluginLog Log { get; set; } = null!;
+    [PluginService] private static IDataManager DataManager { get; set; } = null!;
+    [PluginService] private static IGameInteropProvider GameInteropProvider { get; set; } = null!;
 
     private readonly List<DetectedObject> detectedObjects = [];
     private readonly HashSet<ulong> announcedObjects = [];
@@ -56,6 +63,13 @@ public sealed class Plugin : IDalamudPlugin
     private uint lastTerritoryId;
     private uint lastMapId;
     private DateTime areaChangedAt = DateTime.UtcNow;
+    private bool mapMarkersInjected;
+    private byte nativeMapMarkerCount;
+    private byte injectedMapMarkerCount;
+    private int requestedMapMarkerSignature = int.MinValue;
+    private readonly Hook<CreateMapMarkersDelegate> createMapMarkersHook;
+
+    private unsafe delegate void CreateMapMarkersDelegate(AgentMap* agentMap, bool omitAetherytes);
 
     public Plugin()
     {
@@ -73,10 +87,25 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += this.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += this.OpenWindow;
         PluginInterface.UiBuilder.OpenMainUi += this.OpenWindow;
+
+        unsafe
+        {
+            this.createMapMarkersHook =
+                GameInteropProvider.HookFromAddress<CreateMapMarkersDelegate>(
+                    AgentMap.Addresses.CreateMapMarkers.Value,
+                    this.CreateMapMarkersDetour);
+        }
+
+        this.createMapMarkersHook.Enable();
     }
 
-    public void Dispose()
+    public unsafe void Dispose()
     {
+        this.createMapMarkersHook.Disable();
+        var agentMap = AgentMap.Instance();
+        if (agentMap != null)
+            this.RemoveLocalMapMarkers(agentMap);
+        this.createMapMarkersHook.Dispose();
         PluginInterface.UiBuilder.Draw -= this.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= this.OpenWindow;
         PluginInterface.UiBuilder.OpenMainUi -= this.OpenWindow;
@@ -94,6 +123,7 @@ public sealed class Plugin : IDalamudPlugin
         this.ResetTransientStateAfterAreaChange();
         this.RefreshDetectedObjects();
         this.UpdateTrackedChestRecords();
+        this.UpdateLocalMapMarkers();
 
         if (this.configuration.Enabled)
             this.AnnounceNewObjects();
@@ -118,6 +148,8 @@ public sealed class Plugin : IDalamudPlugin
         this.announcedObjects.Clear();
         this.observedChestRecords.Clear();
         this.missingChestSince.Clear();
+        this.mapMarkersInjected = false;
+        this.requestedMapMarkerSignature = int.MinValue;
     }
 
     private void RefreshDetectedObjects()
@@ -254,12 +286,20 @@ public sealed class Plugin : IDalamudPlugin
         if (gameObject is IPlayerCharacter)
             return MarkerKind.None;
 
-        if (this.configuration.ChestBaseIds.Contains(gameObject.BaseId))
-            return MarkerKind.Chest;
-
+        // The carrot itself is an anonymous EventObj and must remain detectable even
+        // if the game assigns ownership metadata while it is being interacted with.
         if (gameObject.BaseId == ChewedCarrotBaseId
             || this.configuration.CarrotBaseIds.Contains(gameObject.BaseId))
             return MarkerKind.Carrot;
+
+        // Reward coffers spawned by another player's carrot/rabbit dig have an owner.
+        // Natural island treasure chests do not. Exclude owned objects before either
+        // learned BaseId rules or localized name matching can classify them as chests.
+        if (gameObject.OwnerId is not 0 and not 0xE0000000)
+            return MarkerKind.None;
+
+        if (this.configuration.ChestBaseIds.Contains(gameObject.BaseId))
+            return MarkerKind.Chest;
 
         var name = this.GetObjectName(gameObject);
         if (name.Length == 0)
@@ -298,6 +338,126 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private unsafe void UpdateLocalMapMarkers()
+    {
+        var agentMap = AgentMap.Instance();
+        if (agentMap == null)
+            return;
+
+        var mapVisible = agentMap->IsAddonShown() && !agentMap->IsAddonHidden();
+        if (!mapVisible)
+            return;
+
+        var signature = this.BuildMapMarkerSignature();
+        if (signature == this.requestedMapMarkerSignature)
+            return;
+
+        this.requestedMapMarkerSignature = signature;
+        agentMap->UpdateFlags |= 2;
+    }
+
+    private unsafe void CreateMapMarkersDetour(AgentMap* agentMap, bool omitAetherytes)
+    {
+        try
+        {
+            this.InjectLocalMapMarkers(agentMap);
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception, "向地图重建流程注入宝箱标记失败。");
+        }
+
+        this.createMapMarkersHook.Original(agentMap, omitAetherytes);
+    }
+
+    private unsafe void InjectLocalMapMarkers(AgentMap* agentMap)
+    {
+        if (this.mapMarkersInjected && agentMap->MapMarkerCount == this.injectedMapMarkerCount)
+            agentMap->MapMarkerCount = this.nativeMapMarkerCount;
+
+        this.mapMarkersInjected = false;
+
+        var territoryId = ClientState.TerritoryType;
+        var mapId = ClientState.MapId;
+        var displayedTerritoryId = agentMap->SelectedTerritoryId != 0
+            ? agentMap->SelectedTerritoryId
+            : agentMap->CurrentTerritoryId;
+        var displayedMapId = agentMap->SelectedMapId != 0
+            ? agentMap->SelectedMapId
+            : agentMap->CurrentMapId;
+        if (!this.configuration.Enabled
+            || !this.configuration.ShowChests
+            || displayedTerritoryId != territoryId
+            || displayedMapId != mapId)
+        {
+            return;
+        }
+
+        if (!DataManager.GetExcelSheet<Map>().TryGetRow(mapId, out var map))
+            return;
+
+        var records = this.GetCurrentMapChestRecords();
+        this.nativeMapMarkerCount = agentMap->MapMarkerCount;
+        foreach (var record in records)
+        {
+            var mapPosition = this.GetPosition(record);
+            mapPosition.X += map.OffsetX;
+            mapPosition.Z += map.OffsetY;
+            if (!agentMap->AddMapMarker(
+                    mapPosition,
+                    LocalMapMarkerIconId,
+                    scale: 0,
+                    text: null,
+                    textPosition: 3))
+            {
+                break;
+            }
+        }
+
+        this.injectedMapMarkerCount = agentMap->MapMarkerCount;
+        this.mapMarkersInjected = this.injectedMapMarkerCount > this.nativeMapMarkerCount;
+    }
+
+    private TrackedChestRecord[] GetCurrentMapChestRecords()
+        => this.configuration.TrackedChests
+            .Where(record =>
+                record.TerritoryId == ClientState.TerritoryType
+                && record.MapId == ClientState.MapId)
+            .OrderBy(record => record.X)
+            .ThenBy(record => record.Z)
+            .ToArray();
+
+    private int BuildMapMarkerSignature()
+        => this.BuildMapMarkerSignature(this.GetCurrentMapChestRecords());
+
+    private int BuildMapMarkerSignature(IEnumerable<TrackedChestRecord> records)
+    {
+        var signatureBuilder = new HashCode();
+        signatureBuilder.Add(ClientState.TerritoryType);
+        signatureBuilder.Add(ClientState.MapId);
+        signatureBuilder.Add(this.configuration.Enabled);
+        signatureBuilder.Add(this.configuration.ShowChests);
+        foreach (var record in records)
+        {
+            signatureBuilder.Add(BitConverter.SingleToInt32Bits(record.X));
+            signatureBuilder.Add(BitConverter.SingleToInt32Bits(record.Z));
+        }
+
+        return signatureBuilder.ToHashCode();
+    }
+    private unsafe void RemoveLocalMapMarkers(AgentMap* agentMap)
+    {
+        if (!this.mapMarkersInjected)
+            return;
+
+        if (agentMap->MapMarkerCount == this.injectedMapMarkerCount)
+        {
+            agentMap->MapMarkerCount = this.nativeMapMarkerCount;
+            agentMap->UpdateFlags |= 2;
+        }
+
+        this.mapMarkersInjected = false;
+    }
     private void DrawWorldMarkers()
     {
         var drawList = ImGui.GetForegroundDrawList();
@@ -574,7 +734,7 @@ public sealed class Plugin : IDalamudPlugin
             var distance = Vector3.Distance(localPlayer.Position, gameObject.Position);
             ImGui.PushID($"scan-{gameObject.GameObjectId}-{gameObject.ObjectIndex}");
             ImGui.TextUnformatted(
-                $"{distance,5:F1}m  {displayName}  BaseId:{gameObject.BaseId}  实体:{gameObject.EntityId:X8}  索引:{gameObject.ObjectIndex}  {gameObject.ObjectKind}  可选:{gameObject.IsTargetable}");
+                $"{distance,5:F1}m  {displayName}  BaseId:{gameObject.BaseId}  实体:{gameObject.EntityId:X8}  Owner:{gameObject.OwnerId:X8}  索引:{gameObject.ObjectIndex}  {gameObject.ObjectKind}  可选:{gameObject.IsTargetable}");
             ImGui.SameLine();
             if (ImGui.SmallButton("设为宝箱"))
                 this.AddCustomObject(gameObject, MarkerKind.Chest);
