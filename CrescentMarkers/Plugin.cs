@@ -28,6 +28,7 @@ public sealed class Plugin : IDalamudPlugin
     private const float ChestRemovalDistance = 50f;
     private const uint LocalMapMarkerIconId = 60563;
     private const uint ChewedCarrotBaseId = 2010139;
+    private static readonly HashSet<uint> SupportedTerritoryIds = [1252, 1346];
     private static readonly TimeSpan ChestMissingGracePeriod = TimeSpan.FromMilliseconds(750);
     private static readonly TimeSpan AreaLoadGracePeriod = TimeSpan.FromSeconds(5);
 
@@ -76,6 +77,12 @@ public sealed class Plugin : IDalamudPlugin
         this.configuration =
             PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
+        if (this.configuration.TrackedChests.RemoveAll(record =>
+                !SupportedTerritoryIds.Contains(record.TerritoryId)) > 0)
+        {
+            this.Save();
+        }
+
         CommandManager.AddHandler(
             Command,
             new CommandInfo(this.OnCommand)
@@ -121,18 +128,29 @@ public sealed class Plugin : IDalamudPlugin
     private void Draw()
     {
         this.ResetTransientStateAfterAreaChange();
-        this.RefreshDetectedObjects();
-        this.UpdateTrackedChestRecords();
-        this.UpdateLocalMapMarkers();
+        if (this.IsSupportedTerritory())
+        {
+            this.RefreshDetectedObjects();
+            this.UpdateTrackedChestRecords();
+            this.UpdateLocalMapMarkers();
 
-        if (this.configuration.Enabled)
-            this.AnnounceNewObjects();
+            if (this.configuration.Enabled)
+                this.AnnounceNewObjects();
 
-        if (this.configuration.Enabled && !GameGui.GameUiHidden)
-            this.DrawWorldMarkers();
+            if (this.configuration.Enabled && !GameGui.GameUiHidden)
+                this.DrawWorldMarkers();
+        }
+        else
+        {
+            this.detectedObjects.Clear();
+            this.UpdateLocalMapMarkers();
+        }
 
         this.DrawWindow();
     }
+
+    private bool IsSupportedTerritory()
+        => SupportedTerritoryIds.Contains(ClientState.TerritoryType);
 
     private void ResetTransientStateAfterAreaChange()
     {
@@ -385,7 +403,8 @@ public sealed class Plugin : IDalamudPlugin
         var displayedMapId = agentMap->SelectedMapId != 0
             ? agentMap->SelectedMapId
             : agentMap->CurrentMapId;
-        if (!this.configuration.Enabled
+        if (!this.IsSupportedTerritory()
+            || !this.configuration.Enabled
             || !this.configuration.ShowChests
             || displayedTerritoryId != territoryId
             || displayedMapId != mapId)
@@ -605,6 +624,15 @@ public sealed class Plugin : IDalamudPlugin
         {
             this.configuration.MaxDistance = maxDistance;
             this.Save();
+        }
+
+        if (!this.IsSupportedTerritory())
+        {
+            ImGui.Separator();
+            ImGui.TextWrapped("当前不在新月岛南部或新月岛北部，插件已暂停扫描、记录和标记。");
+            ImGui.TextUnformatted("命令：/ocmark");
+            ImGui.End();
+            return;
         }
 
         ImGui.Separator();
