@@ -25,12 +25,12 @@ public sealed class Plugin : IDalamudPlugin
     private const uint CarrotColor = 0xFF42A5FF;
     private const uint TextColor = 0xFFFFFFFF;
     private const uint ShadowColor = 0xE0000000;
-    private const float ChestRemovalDistance = 50f;
+    private const float ChestRemovalDistance = 80f;
     private const uint LocalMapMarkerIconId = 60563;
     private const uint ChewedCarrotBaseId = 2010139;
     private static readonly HashSet<uint> SupportedTerritoryIds = [1252, 1346];
-    private static readonly TimeSpan ChestMissingGracePeriod = TimeSpan.FromMilliseconds(750);
-    private static readonly TimeSpan AreaLoadGracePeriod = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ChestMissingGracePeriod = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan AreaLoadGracePeriod = TimeSpan.FromSeconds(2);
 
     private static readonly string[] ChestKeywords =
     [

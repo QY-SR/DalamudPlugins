@@ -25,7 +25,7 @@
         "Author":  "QianyanSR",
         "Name":  "新月岛宝藏标记",
         "InternalName":  "CrescentMarkers",
-        "AssemblyVersion":  "1.0.12.0",
+        "AssemblyVersion":  "1.0.13.0",
         "Description":  "在屏幕和列表中标记新月岛附近的宝箱与被啃过的胡萝卜。支持本地地图旗标，并在默语频道输出可点击坐标。",
         "ApplicableVersion":  "any",
         "Tags":  [
@@ -40,7 +40,7 @@
         "IsTestingExclusive":  false,
         "DownloadLinkInstall":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/CrescentMarkers/latest.zip",
         "DownloadLinkUpdate":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/CrescentMarkers/latest.zip",
-        "LastUpdate":  "1785503022",
+        "LastUpdate":  "1785550423",
         "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
         "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/CrescentMarkers.png"
     },
