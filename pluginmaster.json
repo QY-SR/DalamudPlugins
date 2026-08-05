@@ -19,7 +19,7 @@
         "DownloadLinkUpdate":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/CombatModelBlocker/latest.zip",
         "LastUpdate":  "1785473206",
         "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
-        "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/CombatModelBlocker.png"
+        "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/CombatModelBlocker.png?v=20260805-512"
     },
     {
         "Author":  "QianyanSR",
@@ -42,7 +42,7 @@
         "DownloadLinkUpdate":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/CrescentMarkers/latest.zip",
         "LastUpdate":  "1785550423",
         "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
-        "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/CrescentMarkers.png"
+        "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/CrescentMarkers.png?v=20260805-512"
     },
     {
         "Author":  "QianyanSR",
@@ -64,6 +64,28 @@
         "DownloadLinkUpdate":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/WhiteMageCureRedirect/latest.zip",
         "LastUpdate":  "1785473206",
         "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
-        "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/WhiteMageCureRedirect.png"
+        "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/WhiteMageCureRedirect.png?v=20260805-512"
+    },
+    {
+        "Author":  "QianyanSR",
+        "Name":  "背包格子锁",
+        "InternalName":  "InventorySlotLock",
+        "AssemblyVersion":  "1.3.4.0",
+        "Description":  "可锁定四页角色背包中的指定格子。受保护道具不会参与自动整理，仍可选中、使用和手动拖动，但无法出售、丢弃或上交任务。支持物品右键菜单、纯本地幽灵物品、物品 ID 浏览器和 /isl 设置窗口。",
+        "ApplicableVersion":  "any",
+        "Tags":  [
+                     "背包",
+                     "整理",
+                     "保护"
+                 ],
+        "DalamudApiLevel":  15,
+        "Punchline":  "保护指定背包道具，允许使用和拖动，阻止出售、丢弃与任务上交。",
+        "IsHide":  false,
+        "IsTestingExclusive":  false,
+        "DownloadLinkInstall":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/InventorySlotLock/latest.zip",
+        "DownloadLinkUpdate":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/InventorySlotLock/latest.zip",
+        "LastUpdate":  "1785930399",
+        "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
+        "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/InventorySlotLock.png?v=20260805-512"
     }
 ]
