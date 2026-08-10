@@ -1,0 +1,17 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <AssemblyName>QuickAutoTranslate</AssemblyName>
+    <RootNamespace>QuickAutoTranslate</RootNamespace>
+    <AssemblyVersion>1.5.0.0</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <IsPackable>false</IsPackable>
+    <Authors>QianyanSR</Authors>
+    <RepositoryType>Git</RepositoryType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Configuration.cs" />
+    <Compile Include="PinyinInitials.cs" />
+    <Compile Include="Plugin.cs" />
+  </ItemGroup>
+</Project>

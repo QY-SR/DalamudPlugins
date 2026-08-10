@@ -1,11 +1,12 @@
 # QY-SR Dalamud 自定义插件仓库
 
-此仓库同时发布以下四个 Dalamud API 15 插件：
+此仓库同时发布以下五个 Dalamud API 15 插件：
 
 - 战斗模型屏蔽（CombatModelBlocker）
 - 新月岛宝藏标记（CrescentMarkers）
 - 白魔低等级救疗重定向（WhiteMageCureRedirect）
 - 背包格子锁（InventorySlotLock）
+- 定型文快速筛选（QuickAutoTranslate）
 
 ## 仓库地址
 

@@ -87,5 +87,27 @@
         "LastUpdate":  "1785930399",
         "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins",
         "IconUrl":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/InventorySlotLock.png?v=20260805-512"
+    },
+    {
+        "Author":  "QianyanSR",
+        "Name":  "定型文快速筛选",
+        "InternalName":  "QuickAutoTranslate",
+        "AssemblyVersion":  "1.5.0.0",
+        "Description":  "为原生定型文提供轻量快速搜索窗口，支持中文与拼音筛选、动态技能和历史技能定型文。历史技能热键栏支持按当前或指定职业筛选、查看旧技能描述与原图标，并在图标失效时显示默认失效图标。使用 /qat 打开，/qat hotbar 打开历史技能热键栏。",
+        "ApplicableVersion":  "any",
+        "Tags":  [
+                     "定型文",
+                     "聊天",
+                     "拼音",
+                     "搜索"
+                 ],
+        "DalamudApiLevel":  15,
+        "Punchline":  "用中文或拼音首字母快速查找并插入定型文。",
+        "IsHide":  false,
+        "IsTestingExclusive":  false,
+        "DownloadLinkInstall":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/QuickAutoTranslate/latest.zip",
+        "DownloadLinkUpdate":  "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/QuickAutoTranslate/latest.zip",
+        "LastUpdate":  "1786347664",
+        "RepoUrl":  "https://github.com/QY-SR/DalamudPlugins"
     }
 ]
