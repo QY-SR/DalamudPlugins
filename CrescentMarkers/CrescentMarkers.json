@@ -4,6 +4,7 @@
   "Punchline": "标记新月岛附近的宝箱和好运胡萝卜。",
   "Description": "在屏幕和列表中标记新月岛附近的宝箱与被啃过的胡萝卜。支持本地地图旗标，并在默语频道输出可点击坐标。",
   "ApplicableVersion": "any",
+  "IconUrl": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/CrescentMarkers.png?v=20260811-localmanifest",
   "Tags": [
     "新月岛",
     "宝箱",
