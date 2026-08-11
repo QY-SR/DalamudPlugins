@@ -1,0 +1,12 @@
+{
+  "Author": "QianyanSR",
+  "Name": "增强背包搜索",
+  "Punchline": "检索本地库存，批量取出、存入并整理雇员堆叠。",
+  "Description": "将角色背包、陆行鸟鞍囊、雇员背包、幻化台和收藏柜保存为本地快照并提供搜索。支持按各条目独立数量批量取出与批量存入、“可堆叠物品”筛选，以及跨雇员堆叠整理建议。所有数量均经过原生格子与堆叠上限校验。使用 /isearch 打开。",
+  "InternalName": "InventorySearch",
+  "AssemblyVersion": "1.4.0.0",
+  "ApplicableVersion": "any",
+  "IconUrl": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/InventorySearch.png?v=20260811-inventorysearch",
+  "DalamudApiLevel": 15,
+  "Tags": ["背包", "雇员", "搜索", "幻化"]
+}
