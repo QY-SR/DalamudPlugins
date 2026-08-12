@@ -115,8 +115,8 @@
         "Author": "QianyanSR",
         "Name": "增强背包搜索",
         "InternalName": "InventorySearch",
-        "AssemblyVersion": "1.5.1.0",
-        "Description": "将角色背包、陆行鸟鞍囊、雇员背包、幻化台和收藏柜保存为本地快照并提供搜索。支持按各条目独立数量批量取出与批量存入、自动推进 Talk 与确认对话，以及按来源和目标雇员分组执行跨雇员合并。所有数量均经过原生格子与堆叠上限校验。使用 /ebsearch 打开。",
+        "AssemblyVersion": "1.5.2.0",
+        "Description": "将角色背包、陆行鸟鞍囊、雇员背包、幻化台和收藏柜保存为本地快照并提供搜索。支持按各条目独立数量批量取出与批量存入、自动推进 Talk 与确认对话，以及按来源和目标雇员分组执行跨雇员合并。切换雇员时会等待游戏交互状态完全释放，避免残留活动雇员 ID 中断队列。使用 /ebsearch 打开。",
         "ApplicableVersion": "any",
         "Tags": ["背包", "雇员", "搜索", "幻化"],
         "DalamudApiLevel": 15,
@@ -125,7 +125,7 @@
         "IsTestingExclusive": false,
         "DownloadLinkInstall": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/InventorySearch/latest.zip",
         "DownloadLinkUpdate": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/plugins/InventorySearch/latest.zip",
-        "LastUpdate": "1786505500",
+        "LastUpdate": "1786506126",
         "RepoUrl": "https://github.com/QY-SR/DalamudPlugins",
         "IconUrl": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/InventorySearch.png?v=20260811-inventorysearch"
     }

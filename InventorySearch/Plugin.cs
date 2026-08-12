@@ -227,7 +227,7 @@ public sealed class Plugin : IDalamudPlugin
             InventoryBeforeMove = organizerMode
                 ? this.CaptureMatchingInventoryQuantities(result.Item.ItemId, result.Item.IsHq)
                 : [],
-            Stage = WithdrawalStage.OpenBell,
+            Stage = closeAfterMove ? WithdrawalStage.WaitForBellReady : WithdrawalStage.OpenBell,
             DeadlineTick = now + 45_000,
             NextActionTick = now,
         };
@@ -400,6 +400,23 @@ public sealed class Plugin : IDalamudPlugin
 
             switch (request.Stage)
             {
+                case WithdrawalStage.WaitForBellReady:
+                    if (Condition[ConditionFlag.OccupiedSummoningBell])
+                    {
+                        if (activeRetainer != null && activeRetainer->RetainerId == request.RetainerId)
+                        {
+                            request.Stage = WithdrawalStage.WaitForRetainer;
+                            request.NextActionTick = now + 200;
+                            return;
+                        }
+                        request.NextActionTick = now + 200;
+                        this.status = "正在等待上一位雇员对话完全结束……";
+                        return;
+                    }
+                    request.Stage = WithdrawalStage.OpenBell;
+                    request.NextActionTick = now + 200;
+                    return;
+
                 case WithdrawalStage.OpenBell:
                     if (Condition[ConditionFlag.OccupiedSummoningBell]
                         && activeRetainer != null && activeRetainer->RetainerId == request.RetainerId)
@@ -880,7 +897,11 @@ public sealed class Plugin : IDalamudPlugin
         this.BeginDeposit(result, (int)suggestion.Quantity, organizerMode: true);
     }
 
-    private unsafe bool CanStartDeposit(StackableResult result, int quantity, out string reason)
+    private unsafe bool CanStartDeposit(
+        StackableResult result,
+        int quantity,
+        out string reason,
+        bool allowRetainerTransition = false)
     {
         if (!ClientState.IsLoggedIn || !PlayerState.IsLoaded || PlayerState.ContentId != result.Character.ContentId)
         {
@@ -905,7 +926,8 @@ public sealed class Plugin : IDalamudPlugin
         var retainers = RetainerManager.Instance();
         var active = retainers == null ? null : retainers->GetActiveRetainer();
         if (Condition[ConditionFlag.OccupiedSummoningBell]
-            && active != null && active->RetainerId != 0 && active->RetainerId != result.TargetStorage.OwnerId)
+            && active != null && active->RetainerId != 0 && active->RetainerId != result.TargetStorage.OwnerId
+            && !allowRetainerTransition)
         {
             reason = $"请先结束当前雇员对话，再向 {result.TargetStorage.OwnerName} 存入";
             return false;
@@ -923,7 +945,8 @@ public sealed class Plugin : IDalamudPlugin
         uint? sourceExpectedQuantity = null,
         bool organizerMode = false)
     {
-        if (!this.CanStartDeposit(result, quantity, out var reason))
+        var allowRetainerTransition = batchMode || organizerMode;
+        if (!this.CanStartDeposit(result, quantity, out var reason, allowRetainerTransition))
         {
             this.status = reason;
             return;
@@ -948,7 +971,7 @@ public sealed class Plugin : IDalamudPlugin
             ItemName = result.SourceItem.Name,
             BatchMode = batchMode,
             OrganizerMode = organizerMode,
-            Stage = DepositStage.OpenBell,
+            Stage = allowRetainerTransition ? DepositStage.WaitForBellReady : DepositStage.OpenBell,
             DeadlineTick = now + 45_000,
             NextActionTick = now,
         };
@@ -1081,6 +1104,23 @@ public sealed class Plugin : IDalamudPlugin
             var activeRetainer = retainerManager == null ? null : retainerManager->GetActiveRetainer();
             switch (request.Stage)
             {
+                case DepositStage.WaitForBellReady:
+                    if (Condition[ConditionFlag.OccupiedSummoningBell])
+                    {
+                        if (activeRetainer != null && activeRetainer->RetainerId == request.RetainerId)
+                        {
+                            request.Stage = DepositStage.WaitForRetainer;
+                            request.NextActionTick = now + 200;
+                            return;
+                        }
+                        request.NextActionTick = now + 200;
+                        this.status = "正在等待上一位雇员对话完全结束……";
+                        return;
+                    }
+                    request.Stage = DepositStage.OpenBell;
+                    request.NextActionTick = now + 200;
+                    return;
+
                 case DepositStage.OpenBell:
                     if (Condition[ConditionFlag.OccupiedSummoningBell]
                         && activeRetainer != null && activeRetainer->RetainerId == request.RetainerId)
@@ -2252,6 +2292,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private enum WithdrawalStage
     {
+        WaitForBellReady,
         OpenBell,
         WaitForList,
         WaitForRetainer,
@@ -2267,6 +2308,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private enum DepositStage
     {
+        WaitForBellReady,
         OpenBell,
         WaitForList,
         WaitForRetainer,
