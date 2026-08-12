@@ -73,7 +73,7 @@ internal sealed class Runtime : IDisposable
             new CommandInfo(this.OnCommand)
             {
                 HelpMessage = "打开“战斗模型屏蔽”设置。",
-                ShowInHelp = true,
+                ShowInHelp = false,
             });
 
         this.framework.Update += this.OnFrameworkUpdate;

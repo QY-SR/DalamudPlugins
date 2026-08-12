@@ -102,7 +102,7 @@ internal sealed class Runtime : IDisposable
             new CommandInfo(this.OnCommand)
             {
                 HelpMessage = "打开新月岛宝藏标记窗口。",
-                ShowInHelp = true,
+                ShowInHelp = false,
             });
 
         PluginInterface.UiBuilder.Draw += this.Draw;

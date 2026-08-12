@@ -77,7 +77,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(Command, new CommandInfo(this.OnCommand)
         {
             HelpMessage = "打开 QToolKit。",
-            ShowInHelp = true,
+            ShowInHelp = false,
         });
         PluginInterface.UiBuilder.Draw += this.Draw;
         PluginInterface.UiBuilder.OpenMainUi += this.OpenWindow;
@@ -96,20 +96,20 @@ public sealed class Plugin : IDalamudPlugin
     private void RegisterModules()
     {
         this.moduleHost.Register(new RuntimeModule<CombatRuntime>(
-            "CombatModelBlocker", "战斗模型屏蔽", "按规则隐藏非小队玩家模型，保留原有 /cmb 设置入口。",
+            "CombatModelBlocker", "战斗模型屏蔽", "1.0.5.0", "按规则隐藏非小队玩家模型。", "/cmb：打开战斗模型屏蔽设置。",
             () => new CombatRuntime(this.context, this.configuration.CombatModelBlocker), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new RuntimeModule<CrescentRuntime>(
-            "CrescentMarkers", "新月岛宝藏标记", "记录并标记新月岛宝箱与胡萝卜，保留原有 /ocmark 设置入口。",
+            "CrescentMarkers", "新月岛宝藏标记", "1.0.14.0", "记录并标记新月岛宝箱与胡萝卜。", "/ocmark：打开新月岛宝藏标记窗口。",
             () => new CrescentRuntime(this.context, this.configuration.CrescentMarkers), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new Modules.WhiteMageCureRedirectModule(this.context));
         this.moduleHost.Register(new RuntimeModule<SlotLockRuntime>(
-            "InventorySlotLock", "背包格子锁", "保护指定背包格子并管理本地幽灵物品，保留原有 /isl 设置入口。",
+            "InventorySlotLock", "背包格子锁", "1.3.5.0", "保护指定背包格子并管理本地幽灵物品。", "/isl：打开设置。\n/isl create <物品ID> <数量>：生成纯本地幽灵物品。\n/isl clearfake：清除全部本地幽灵物品。",
             () => new SlotLockRuntime(this.context, this.configuration.InventorySlotLock), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new RuntimeModule<TranslateRuntime>(
-            "QuickAutoTranslate", "定型文快速筛选", "通过中文或拼音检索定型文与历史技能，保留原有 /qat 设置入口。",
+            "QuickAutoTranslate", "定型文快速筛选", "1.5.1.0", "通过中文或拼音检索定型文与历史技能。", "/qat：打开定型文快速筛选。\n/qat hotbar：打开历史技能热键栏。",
             () => new TranslateRuntime(this.context, this.configuration.QuickAutoTranslate), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new RuntimeModule<SearchRuntime>(
-            "InventorySearch", "增强背包搜索", "检索并整理保存的库存快照，保留原有 /ebsearch 设置入口。",
+            "InventorySearch", "增强背包搜索", "1.5.3.0", "检索并整理保存的库存快照。", "/ebsearch：打开跨角色背包与收藏搜索窗口。\n/ebsearch refresh：立即刷新库存快照。",
             () => new SearchRuntime(this.context, this.configuration.InventorySearch), runtime => runtime.OpenWindow()));
     }
 
@@ -146,7 +146,11 @@ public sealed class Plugin : IDalamudPlugin
                     ? new Vector4(0.30f, 0.82f, 0.48f, 1f)
                     : new Vector4(0.48f, 0.50f, 0.54f, 1f), "●");
                 ImGui.SameLine();
-                if (ImGui.Selectable(module.DisplayName, this.selectedPage == index, ImGuiSelectableFlags.None, new Vector2(0f, 30f)))
+                if (ImGui.Selectable(
+                        $"{module.DisplayName}\nv{module.Version}##module-{module.Id}",
+                        this.selectedPage == index,
+                        ImGuiSelectableFlags.None,
+                        new Vector2(0f, 42f)))
                     this.selectedPage = index;
             }
             ImGui.Spacing();
@@ -171,9 +175,12 @@ public sealed class Plugin : IDalamudPlugin
     private void DrawModulePage(IToolkitModule module)
     {
         ImGui.TextUnformatted(module.DisplayName);
-        ImGui.TextDisabled(module.Id);
+        ImGui.TextDisabled($"{module.Id} · v{module.Version}");
         ImGui.Spacing();
         ImGui.TextWrapped(module.Description);
+        ImGui.Spacing();
+        ImGui.TextDisabled("可用命令");
+        ImGui.TextWrapped(module.CommandHelp);
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();

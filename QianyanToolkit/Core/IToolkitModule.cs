@@ -8,7 +8,11 @@ internal interface IToolkitModule : IDisposable
 
     string DisplayName { get; }
 
+    string Version { get; }
+
     string Description { get; }
+
+    string CommandHelp { get; }
 
     bool IsRunning { get; }
 

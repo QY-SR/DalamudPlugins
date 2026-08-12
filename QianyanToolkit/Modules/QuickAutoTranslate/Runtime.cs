@@ -83,7 +83,7 @@ internal sealed class Runtime : IDisposable
         CommandManager.AddHandler(Command, new CommandInfo(this.OnCommand)
         {
             HelpMessage = "打开定型文快速筛选。使用 /qat hotbar 打开历史技能热键栏。",
-            ShowInHelp = true,
+            ShowInHelp = false,
         });
 
         PluginInterface.UiBuilder.Draw += this.DrawWindow;

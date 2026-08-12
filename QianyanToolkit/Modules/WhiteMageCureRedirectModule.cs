@@ -26,7 +26,11 @@ internal sealed unsafe class WhiteMageCureRedirectModule : IToolkitModule
 
     public string DisplayName => "白魔低等级救疗重定向";
 
+    public string Version => "1.0.1.0";
+
     public string Description => "低等级同步且尚未解锁救疗时，将救疗重定向为治疗。";
+
+    public string CommandHelp => "此模块无需命令。";
 
     public bool IsRunning => this.useActionHook.IsEnabled;
 

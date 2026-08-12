@@ -105,7 +105,7 @@ internal sealed class Runtime : IDisposable
         CommandManager.AddHandler(Command, new Dalamud.Game.Command.CommandInfo(this.OnCommand)
         {
             HelpMessage = "打开设置；/isl create <物品ID> <数量> 生成纯本地整蛊物品。",
-            ShowInHelp = true,
+            ShowInHelp = false,
         });
 
         ContextMenu.OnMenuOpened += this.OnMenuOpened;

@@ -19,6 +19,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using NativeGameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 using LuminaCabinet = Lumina.Excel.Sheets.Cabinet;
 using LuminaItem = Lumina.Excel.Sheets.Item;
+using QianyanLegacy;
 
 namespace InventorySearch;
 
@@ -71,6 +72,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Queue<OrganizerSuggestion> organizerWithdrawalQueue = new();
     private readonly Queue<OrganizerDepositItem> organizerDepositQueue = new();
     private bool windowOpen;
+    private bool migrationNoticeRequested;
     private string search = string.Empty;
     private string selectedCharacter = "全部角色";
     private int selectedKind;
@@ -124,11 +126,16 @@ public sealed class Plugin : IDalamudPlugin
     private void OnCommand(string _, string arguments)
     {
         this.windowOpen = true;
+        this.migrationNoticeRequested = true;
         if (arguments.Trim().Equals("refresh", StringComparison.OrdinalIgnoreCase))
             this.ScanNow(true);
     }
 
-    private void OpenWindow() => this.windowOpen = true;
+    private void OpenWindow()
+    {
+        this.windowOpen = true;
+        this.migrationNoticeRequested = true;
+    }
 
     private void OnFrameworkUpdate(IFramework _)
     {
@@ -1742,6 +1749,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void DrawWindow()
     {
+        OldStableNotice.Draw("InventorySearch", ref this.migrationNoticeRequested);
         if (!this.windowOpen)
             return;
         ImGui.SetNextWindowSize(new Vector2(860, 620), ImGuiCond.FirstUseEver);

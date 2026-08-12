@@ -10,18 +10,22 @@ internal sealed class RuntimeModule<TRuntime> : IToolkitModule
     private readonly Action<TRuntime> openSettings;
     private TRuntime? runtime;
 
-    public RuntimeModule(string id, string displayName, string description, Func<TRuntime> factory, Action<TRuntime> openSettings)
+    public RuntimeModule(string id, string displayName, string version, string description, string commandHelp, Func<TRuntime> factory, Action<TRuntime> openSettings)
     {
         this.Id = id;
         this.DisplayName = displayName;
+        this.Version = version;
         this.Description = description;
+        this.CommandHelp = commandHelp;
         this.factory = factory;
         this.openSettings = openSettings;
     }
 
     public string Id { get; }
     public string DisplayName { get; }
+    public string Version { get; }
     public string Description { get; }
+    public string CommandHelp { get; }
     public bool IsRunning => this.runtime != null;
 
     public void Start() => this.runtime ??= this.factory();

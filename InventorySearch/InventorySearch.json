@@ -1,12 +1,12 @@
 {
   "Author": "QianyanSR",
   "Name": "增强背包搜索",
-  "Punchline": "检索本地库存，批量取出、存入并整理雇员堆叠。",
+  "Punchline": "[oldstable] 新版功能已迁移至 QToolKit。",
   "Description": "将角色背包、陆行鸟鞍囊、雇员背包、幻化台和收藏柜保存为本地快照并提供搜索。鸟包按已加载页面增量合并并保留未加载页；雇员仅在背包窗口和全部页面就绪时更新，避免按需加载或残留状态清空、串写本地索引。支持批量取存与跨雇员合并。使用 /ebsearch 打开。",
   "InternalName": "InventorySearch",
-  "AssemblyVersion": "1.5.3.0",
+  "AssemblyVersion": "1.5.4.0",
   "ApplicableVersion": "any",
   "IconUrl": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/InventorySearch.png?v=20260811-inventorysearch",
   "DalamudApiLevel": 15,
-  "Tags": ["背包", "雇员", "搜索", "幻化"]
+  "Tags": ["背包", "雇员", "搜索", "幻化", "oldstable"]
 }

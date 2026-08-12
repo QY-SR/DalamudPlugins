@@ -3,11 +3,15 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using QianyanLegacy;
 
 namespace WhiteMageCureRedirect;
 
 public sealed unsafe class Plugin : IDalamudPlugin
 {
+    [PluginService]
+    private static IDalamudPluginInterface PluginInterface { get; set; } = null!;
+
     [PluginService]
     private static IPlayerState PlayerState { get; set; } = null!;
 
@@ -20,6 +24,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
     private const byte CureIIUnlockLevel = 30;
 
     private readonly Hook<UseActionDelegate> useActionHook;
+    private bool migrationNoticeRequested;
 
     public Plugin()
     {
@@ -27,10 +32,24 @@ public sealed unsafe class Plugin : IDalamudPlugin
             ActionManager.MemberFunctionPointers.UseAction,
             this.UseActionDetour);
         this.useActionHook.Enable();
+        PluginInterface.UiBuilder.Draw += this.DrawNotice;
+        PluginInterface.UiBuilder.OpenMainUi += this.OpenNotice;
+        PluginInterface.UiBuilder.OpenConfigUi += this.OpenNotice;
     }
 
     public void Dispose()
-        => this.useActionHook.Dispose();
+    {
+        PluginInterface.UiBuilder.Draw -= this.DrawNotice;
+        PluginInterface.UiBuilder.OpenMainUi -= this.OpenNotice;
+        PluginInterface.UiBuilder.OpenConfigUi -= this.OpenNotice;
+        this.useActionHook.Dispose();
+    }
+
+    private void OpenNotice()
+        => this.migrationNoticeRequested = true;
+
+    private void DrawNotice()
+        => OldStableNotice.Draw("WhiteMageCureRedirect", ref this.migrationNoticeRequested);
 
     private bool UseActionDetour(
         ActionManager* actionManager,

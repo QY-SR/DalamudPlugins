@@ -15,6 +15,7 @@ using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Lumina.Excel.Sheets;
+using QianyanLegacy;
 
 namespace CrescentMarkers;
 
@@ -61,6 +62,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Dictionary<TrackedChestRecord, DateTime> missingChestSince = [];
     private Configuration configuration;
     private bool windowOpen;
+    private bool migrationNoticeRequested;
     private uint lastTerritoryId;
     private uint lastMapId;
     private DateTime areaChangedAt = DateTime.UtcNow;
@@ -120,10 +122,16 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     private void OnCommand(string command, string arguments)
-        => this.windowOpen = true;
+    {
+        this.windowOpen = true;
+        this.migrationNoticeRequested = true;
+    }
 
     private void OpenWindow()
-        => this.windowOpen = true;
+    {
+        this.windowOpen = true;
+        this.migrationNoticeRequested = true;
+    }
 
     private void Draw()
     {
@@ -572,6 +580,7 @@ public sealed class Plugin : IDalamudPlugin
     }
     private void DrawWindow()
     {
+        OldStableNotice.Draw("CrescentMarkers", ref this.migrationNoticeRequested);
         if (!this.windowOpen)
             return;
 

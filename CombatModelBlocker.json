@@ -1,13 +1,14 @@
 {
   "Author": "QianyanSR",
   "Name": "战斗模型屏蔽",
-  "Punchline": "在战斗中或常驻屏蔽非小队玩家模型。",
+  "Punchline": "[oldstable] 新版功能已迁移至 QToolKit。",
   "Description": "屏蔽所有非小队成员的玩家模型，可选择仅在战斗中生效或常驻生效，并可保留死亡玩家模型以便完成复活成就。",
   "ApplicableVersion": "any",
   "IconUrl": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/CombatModelBlocker.png?v=20260811-localmanifest",
   "Tags": [
     "模型",
     "战斗",
-    "性能"
+    "性能",
+    "oldstable"
   ]
 }

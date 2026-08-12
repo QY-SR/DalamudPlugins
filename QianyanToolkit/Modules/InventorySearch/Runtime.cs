@@ -116,7 +116,7 @@ internal sealed class Runtime : IDisposable
         CommandManager.AddHandler(Command, new CommandInfo(this.OnCommand)
         {
             HelpMessage = "打开跨角色背包与收藏搜索窗口。",
-            ShowInHelp = true,
+            ShowInHelp = false,
         });
         Framework.Update += this.OnFrameworkUpdate;
         PluginInterface.UiBuilder.Draw += this.DrawWindow;

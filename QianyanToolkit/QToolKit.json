@@ -4,7 +4,7 @@
   "Punchline": "将常用功能集中于一处的模块化插件合集。",
   "Description": "一个注重整合体验与模块化管理的卫月插件合集。通过统一入口管理各项功能，支持按需启用、独立设置，并可导入旧版数据完成平滑迁移。",
   "InternalName": "QToolKit",
-  "AssemblyVersion": "1.0.1.0",
+  "AssemblyVersion": "1.0.2.0",
   "ApplicableVersion": "any",
   "IconUrl": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/QToolKit.png?v=20260812-qtk-1",
   "DalamudApiLevel": 15,

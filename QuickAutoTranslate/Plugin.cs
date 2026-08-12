@@ -12,6 +12,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using Lumina.Text.Payloads;
 using Lumina.Excel.Sheets;
+using QianyanLegacy;
 
 namespace QuickAutoTranslate;
 
@@ -47,6 +48,7 @@ public sealed class Plugin : IDalamudPlugin
     private List<Entry> visibleEntries = [];
     private string search = string.Empty;
     private bool windowOpen;
+    private bool migrationNoticeRequested;
     private bool historicalWindowOpen;
     private bool requestSearchFocus;
     private int selectedIndex;
@@ -368,6 +370,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string arguments)
     {
+        this.migrationNoticeRequested = true;
         if (arguments.Trim().Equals("hotbar", StringComparison.OrdinalIgnoreCase)
             || arguments.Trim().Equals("history", StringComparison.OrdinalIgnoreCase))
         {
@@ -382,6 +385,7 @@ public sealed class Plugin : IDalamudPlugin
     private void OpenWindow()
     {
         this.windowOpen = true;
+        this.migrationNoticeRequested = true;
         this.requestSearchFocus = true;
         this.selectedIndex = 0;
         this.UpdateVisibleEntries();
@@ -676,6 +680,7 @@ public sealed class Plugin : IDalamudPlugin
     private void DrawWindow()
     {
         this.DrawHistoricalWindow();
+        OldStableNotice.Draw("QuickAutoTranslate", ref this.migrationNoticeRequested);
 
         if (!this.windowOpen)
             return;

@@ -1,13 +1,14 @@
 {
   "Author": "QianyanSR",
   "Name": "白魔低等级救疗重定向",
-  "Punchline": "白魔法师尚未解锁救疗时，将救疗重定向为治疗。",
+  "Punchline": "[oldstable] 新版功能已迁移至 QToolKit。",
   "Description": "游玩白魔法师时，如果当前同步等级尚未达到救疗的解锁等级，按下救疗会改为施放治疗。达到解锁等级后，救疗保持原样。",
   "ApplicableVersion": "any",
   "IconUrl": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/WhiteMageCureRedirect.png?v=20260811-localmanifest",
   "Tags": [
     "白魔法师",
     "技能重定向",
-    "低等级同步"
+    "低等级同步",
+    "oldstable"
   ]
 }

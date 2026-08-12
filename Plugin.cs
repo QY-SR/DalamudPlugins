@@ -11,6 +11,7 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using QianyanLegacy;
 
 namespace CombatModelBlocker;
 
@@ -39,6 +40,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private Configuration configuration;
     private bool configWindowOpen;
+    private bool migrationNoticeRequested;
     // E0000000 是客户端预览/无网络实体对象使用的无效 EntityId。
     // 只有真实地图玩家会进入模型屏蔽流程，铭牌和肖像预览对象会被排除。
     private const uint InvalidEntityId = 0xE0000000;
@@ -86,10 +88,16 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     private void OnCommand(string command, string arguments)
-        => this.configWindowOpen = true;
+    {
+        this.configWindowOpen = true;
+        this.migrationNoticeRequested = true;
+    }
 
     private void OpenConfigWindow()
-        => this.configWindowOpen = true;
+    {
+        this.configWindowOpen = true;
+        this.migrationNoticeRequested = true;
+    }
 
     private void OnFrameworkUpdate(IFramework _)
     {
@@ -234,6 +242,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void DrawConfigWindow()
     {
+        OldStableNotice.Draw("CombatModelBlocker", ref this.migrationNoticeRequested);
         if (!this.configWindowOpen)
             return;
 

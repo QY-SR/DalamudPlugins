@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>WhiteMageCureRedirect</AssemblyName>
     <RootNamespace>WhiteMageCureRedirect</RootNamespace>
-    <AssemblyVersion>1.0.1.0</AssemblyVersion>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
     <FileVersion>$(AssemblyVersion)</FileVersion>
     <IsPackable>false</IsPackable>
     <Authors>QianyanSR</Authors>
@@ -10,6 +10,7 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\OldStableNotice.cs" Link="OldStableNotice.cs" />
     <Compile Include="Plugin.cs" />
   </ItemGroup>
 </Project>

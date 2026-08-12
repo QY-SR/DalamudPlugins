@@ -2,10 +2,13 @@
   <PropertyGroup>
     <AssemblyName>CrescentMarkers</AssemblyName>
     <RootNamespace>CrescentMarkers</RootNamespace>
-    <AssemblyVersion>1.0.14.0</AssemblyVersion>
+    <AssemblyVersion>1.0.15.0</AssemblyVersion>
     <FileVersion>$(AssemblyVersion)</FileVersion>
     <IsPackable>false</IsPackable>
     <Authors>QianyanSR</Authors>
     <RepositoryType>Git</RepositoryType>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\OldStableNotice.cs" Link="OldStableNotice.cs" />
+  </ItemGroup>
 </Project>

@@ -19,6 +19,7 @@ using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using FFXIVClientStructs.Interop;
 using LuminaItem = Lumina.Excel.Sheets.Item;
+using QianyanLegacy;
 
 namespace InventorySlotLock;
 
@@ -55,6 +56,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Dictionary<int, PhysicalSlot> protectedEntries = new();
     private readonly Dictionary<(uint IconId, bool IsHq), ISharedImmediateTexture> iconCache = new();
     private bool windowOpen;
+    private bool migrationNoticeRequested;
     private bool trackingInitialized;
     private string itemBrowserSearch = string.Empty;
     private int fakeItemQuantity = 1;
@@ -149,6 +151,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         this.windowOpen = true;
+        this.migrationNoticeRequested = true;
     }
 
     private void CreateFakeItem(uint itemId, uint quantity)
@@ -239,7 +242,11 @@ public sealed class Plugin : IDalamudPlugin
         return false;
     }
 
-    private void OpenWindow() => this.windowOpen = true;
+    private void OpenWindow()
+    {
+        this.windowOpen = true;
+        this.migrationNoticeRequested = true;
+    }
 
     private void OnFrameworkUpdate(IFramework framework)
     {
@@ -1109,6 +1116,7 @@ public sealed class Plugin : IDalamudPlugin
     private void DrawWindow()
     {
         this.DrawInventoryMarkers();
+        OldStableNotice.Draw("InventorySlotLock", ref this.migrationNoticeRequested);
 
         if (!this.windowOpen)
             return;
