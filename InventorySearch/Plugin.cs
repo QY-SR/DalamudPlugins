@@ -67,7 +67,9 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Dictionary<string, BatchDepositItem> selectedDeposits = new();
     private readonly Queue<BatchDepositItem> batchDepositQueue = new();
     private readonly Dictionary<string, OrganizerSuggestion> selectedOrganizerSuggestions = new();
-    private readonly Queue<OrganizerSuggestion> organizerQueue = new();
+    private readonly Queue<OrganizerTransferGroup> organizerGroupQueue = new();
+    private readonly Queue<OrganizerSuggestion> organizerWithdrawalQueue = new();
+    private readonly Queue<OrganizerDepositItem> organizerDepositQueue = new();
     private bool windowOpen;
     private string search = string.Empty;
     private string selectedCharacter = "全部角色";
@@ -87,6 +89,7 @@ public sealed class Plugin : IDalamudPlugin
     private int batchDepositSkipped;
     private bool organizerActive;
     private OrganizerSuggestion? currentOrganizerSuggestion;
+    private OrganizerTransferGroup? currentOrganizerGroup;
     private int organizerCompleted;
     private int organizerSkipped;
 
@@ -137,9 +140,12 @@ public sealed class Plugin : IDalamudPlugin
             this.batchWithdrawalActive = false;
             this.batchDepositQueue.Clear();
             this.batchDepositActive = false;
-            this.organizerQueue.Clear();
+            this.organizerGroupQueue.Clear();
+            this.organizerWithdrawalQueue.Clear();
+            this.organizerDepositQueue.Clear();
             this.organizerActive = false;
             this.currentOrganizerSuggestion = null;
+            this.currentOrganizerGroup = null;
             this.lastContentId = 0;
             this.status = "等待角色登录";
             return;
@@ -348,6 +354,13 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe bool TryConfirmOperationDialog()
     {
+        var talk = GameGui.GetAddonByName<AtkUnitBase>("Talk");
+        if (talk != null && talk->IsVisible && talk->IsReady)
+        {
+            talk->FireCallbackInt(0);
+            return true;
+        }
+
         var addon = GameGui.GetAddonByName<AtkUnitBase>("SelectYesno");
         if (addon == null || !addon->IsVisible || !addon->IsReady)
             return false;
@@ -619,9 +632,23 @@ public sealed class Plugin : IDalamudPlugin
                         request.ReceivedSlot = receivedSlot;
                         request.ReceivedQuantity = receivedQuantity;
                         request.MoveCompleted = true;
+                        if (this.currentOrganizerSuggestion is not { } suggestion)
+                        {
+                            this.FailWithdrawal("跨雇员整理项目状态丢失，已停止");
+                            return;
+                        }
+                        this.organizerDepositQueue.Enqueue(new OrganizerDepositItem(
+                            suggestion, receivedContainer, receivedSlot, receivedQuantity));
+                        if (this.organizerWithdrawalQueue.Count > 0)
+                        {
+                            this.withdrawal = null;
+                            this.currentOrganizerSuggestion = null;
+                            this.StartNextOrganizerWithdrawal();
+                            return;
+                        }
                         request.Stage = WithdrawalStage.CloseInventory;
                         request.NextActionTick = now + 500;
-                        this.status = "已取出道具，正在切换到目标雇员……";
+                        this.status = "已取出本组道具，正在切换到目标雇员……";
                         return;
                     }
                     if (!request.CloseAfterMove)
@@ -691,7 +718,8 @@ public sealed class Plugin : IDalamudPlugin
                     if (request.OrganizerMode)
                     {
                         this.withdrawal = null;
-                        this.StartOrganizerDeposit(request);
+                        this.currentOrganizerSuggestion = null;
+                        this.StartNextOrganizerDeposit();
                     }
                     else
                     {
@@ -719,9 +747,12 @@ public sealed class Plugin : IDalamudPlugin
         }
         if (this.organizerActive)
         {
-            this.organizerQueue.Clear();
+            this.organizerGroupQueue.Clear();
+            this.organizerWithdrawalQueue.Clear();
+            this.organizerDepositQueue.Clear();
             this.organizerActive = false;
             this.currentOrganizerSuggestion = null;
+            this.currentOrganizerGroup = null;
             message += "；跨雇员整理已停止";
         }
         this.status = message;
@@ -741,7 +772,9 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        this.organizerQueue.Clear();
+        this.organizerGroupQueue.Clear();
+        this.organizerWithdrawalQueue.Clear();
+        this.organizerDepositQueue.Clear();
         var currentContentId = PlayerState.ContentId;
         var selected = this.selectedOrganizerSuggestions.Values
             .Where(entry => entry.Character.ContentId == currentContentId)
@@ -751,6 +784,7 @@ public sealed class Plugin : IDalamudPlugin
             .ThenBy(entry => entry.SourceItem.Slot)
             .ToList();
         this.organizerSkipped = this.selectedOrganizerSuggestions.Count - selected.Count;
+        var valid = new List<OrganizerSuggestion>();
         foreach (var suggestion in selected)
         {
             if (suggestion.Quantity < 1 || suggestion.Quantity > suggestion.SourceItem.Quantity
@@ -760,9 +794,16 @@ public sealed class Plugin : IDalamudPlugin
                 this.organizerSkipped++;
                 continue;
             }
-            this.organizerQueue.Enqueue(suggestion);
+            valid.Add(suggestion);
         }
-        if (this.organizerQueue.Count == 0)
+        foreach (var group in valid.GroupBy(entry => (
+                     entry.Character.ContentId,
+                     SourceRetainerId: entry.SourceStorage.OwnerId,
+                     TargetRetainerId: entry.TargetStorage.OwnerId)))
+        {
+            this.organizerGroupQueue.Enqueue(new OrganizerTransferGroup(group.ToList()));
+        }
+        if (this.organizerGroupQueue.Count == 0)
         {
             this.status = "没有可执行的当前角色跨雇员整理建议";
             return;
@@ -771,46 +812,63 @@ public sealed class Plugin : IDalamudPlugin
         this.selectedOrganizerSuggestions.Clear();
         this.organizerActive = true;
         this.organizerCompleted = 0;
-        this.StartNextOrganizerItem();
+        this.StartNextOrganizerGroup();
     }
 
-    private void StartNextOrganizerItem()
+    private void StartNextOrganizerGroup()
     {
         if (!this.organizerActive)
             return;
-        if (!this.organizerQueue.TryDequeue(out var suggestion))
+        if (!this.organizerGroupQueue.TryDequeue(out var group))
         {
             this.organizerActive = false;
             this.currentOrganizerSuggestion = null;
+            this.currentOrganizerGroup = null;
             this.status = $"跨雇员整理完成：成功 {this.organizerCompleted} 条，跳过 {this.organizerSkipped} 条";
             return;
         }
 
+        this.currentOrganizerGroup = group;
+        this.organizerWithdrawalQueue.Clear();
+        this.organizerDepositQueue.Clear();
+        foreach (var suggestion in group.Items)
+            this.organizerWithdrawalQueue.Enqueue(suggestion);
+        this.StartNextOrganizerWithdrawal();
+    }
+
+    private void StartNextOrganizerWithdrawal()
+    {
+        if (!this.organizerActive || !this.organizerWithdrawalQueue.TryDequeue(out var suggestion))
+            return;
         this.currentOrganizerSuggestion = suggestion;
         var source = new SearchResult(suggestion.Character, suggestion.SourceStorage, suggestion.SourceItem);
         this.BeginWithdrawal(source, (int)suggestion.Quantity, true, true);
         if (this.withdrawal == null)
         {
-            this.organizerQueue.Clear();
+            this.organizerGroupQueue.Clear();
+            this.organizerWithdrawalQueue.Clear();
+            this.organizerDepositQueue.Clear();
             this.organizerActive = false;
             this.currentOrganizerSuggestion = null;
+            this.currentOrganizerGroup = null;
             this.status += "；跨雇员整理已停止";
         }
     }
 
-    private void StartOrganizerDeposit(WithdrawalRequest withdrawalRequest)
+    private void StartNextOrganizerDeposit()
     {
-        if (!this.organizerActive || this.currentOrganizerSuggestion is not { } suggestion)
+        if (!this.organizerActive || !this.organizerDepositQueue.TryDequeue(out var entry))
             return;
+        var suggestion = entry.Suggestion;
         var received = new StoredItem
         {
             ItemId = suggestion.SourceItem.ItemId,
-            Quantity = withdrawalRequest.ReceivedQuantity,
+            Quantity = entry.ReceivedQuantity,
             IsHq = suggestion.SourceItem.IsHq,
             IconId = suggestion.SourceItem.IconId,
             Name = suggestion.SourceItem.Name,
-            Container = (uint)withdrawalRequest.ReceivedContainer,
-            Slot = withdrawalRequest.ReceivedSlot,
+            Container = (uint)entry.ReceivedContainer,
+            Slot = entry.ReceivedSlot,
         };
         var result = new StackableResult(
             suggestion.Character,
@@ -1212,6 +1270,12 @@ public sealed class Plugin : IDalamudPlugin
                             return;
                         }
                     }
+                    if (request.OrganizerMode && this.organizerDepositQueue.Count > 0)
+                    {
+                        this.deposit = null;
+                        this.StartNextOrganizerDeposit();
+                        return;
+                    }
                     request.Stage = DepositStage.CloseInventory;
                     request.NextActionTick = now + 500;
                     this.status = $"已存入 {request.ItemName} ×{request.RequestedQuantity}，正在关闭雇员窗口……";
@@ -1293,9 +1357,12 @@ public sealed class Plugin : IDalamudPlugin
         }
         if (this.organizerActive)
         {
-            this.organizerQueue.Clear();
+            this.organizerGroupQueue.Clear();
+            this.organizerWithdrawalQueue.Clear();
+            this.organizerDepositQueue.Clear();
             this.organizerActive = false;
             this.currentOrganizerSuggestion = null;
+            this.currentOrganizerGroup = null;
             message += "；跨雇员整理已停止";
         }
         this.status = message;
@@ -1312,9 +1379,10 @@ public sealed class Plugin : IDalamudPlugin
             this.StartNextBatchDeposit();
         else if (organizerMode && this.organizerActive)
         {
-            this.organizerCompleted++;
+            this.organizerCompleted += this.currentOrganizerGroup?.Items.Count ?? 0;
             this.currentOrganizerSuggestion = null;
-            this.StartNextOrganizerItem();
+            this.currentOrganizerGroup = null;
+            this.StartNextOrganizerGroup();
         }
     }
 
@@ -2124,6 +2192,14 @@ public sealed class Plugin : IDalamudPlugin
     private sealed record OrganizerHint(uint ItemId, bool IsHq, ulong TargetRetainerId);
 
     private readonly record struct InventorySlotKey(InventoryType Container, ushort Slot);
+
+    private sealed record OrganizerTransferGroup(List<OrganizerSuggestion> Items);
+
+    private sealed record OrganizerDepositItem(
+        OrganizerSuggestion Suggestion,
+        InventoryType ReceivedContainer,
+        ushort ReceivedSlot,
+        uint ReceivedQuantity);
 
     private sealed class WithdrawalRequest
     {
