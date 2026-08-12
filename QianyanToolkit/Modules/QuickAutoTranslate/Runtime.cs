@@ -19,6 +19,8 @@ using QToolKit.Core;
 
 internal sealed class Runtime : IDisposable
 {
+    private const string ChatTag = "QT";
+    private const ushort ChatTagColor = 17;
     private const string Command = "/qat";
     private const string HistoricalActionLookup =
         "Action[11,14,19,25-26,35,47,50,59-60,63-64,67,71-73,79,81,95,103,115,128,134,145-146," +
@@ -551,9 +553,9 @@ internal sealed class Runtime : IDisposable
                             (uint)(this.selectedHotbar - 1),
                             RaptureHotbarModule.HotbarSlotType.Action,
                             selected.RowId))
-                        ChatGui.Print($"[定型文快速筛选] 已把“{selected.Name}”放入第 {this.selectedHotbar} 栏的第一个空槽。");
+                        ChatGui.Print($"已把“{selected.Name}”放入第 {this.selectedHotbar} 栏的第一个空槽。", ChatTag, ChatTagColor);
                     else
-                        ChatGui.PrintError($"[定型文快速筛选] 第 {this.selectedHotbar} 栏没有可用空槽。");
+                        ChatGui.PrintError($"第 {this.selectedHotbar} 栏没有可用空槽。", ChatTag, ChatTagColor);
                 }
                 ImGui.EndDisabled();
             }
@@ -625,7 +627,7 @@ internal sealed class Runtime : IDisposable
             RaptureHotbarModule.HotbarSlotType.Action,
             actionId);
         Log.Information("Placed historical action {ActionId} in hotbar {HotbarId}, slot {SlotId}.", actionId, hotbarIndex, slotIndex);
-        ChatGui.Print($"[定型文快速筛选] 已把“{action.Name}”放入第 {hotbarIndex + 1} 栏第 {slotIndex + 1} 格。技能是否可用仍由游戏判定。");
+        ChatGui.Print($"已把“{action.Name}”放入第 {hotbarIndex + 1} 栏第 {slotIndex + 1} 格。技能是否可用仍由游戏判定。", ChatTag, ChatTagColor);
     }
 
     private void ClearPendingHotbarWrite()
@@ -857,7 +859,7 @@ internal sealed class Runtime : IDisposable
             var chatLog = GameGui.GetAddonByName<AddonChatLog>("ChatLog");
             if (chatLog == null || chatLog->TextInput == null)
             {
-                ChatGui.PrintError("[定型文快速筛选] 聊天输入框当前未载入，请按 Enter 后重试。");
+                ChatGui.PrintError("聊天输入框当前未载入，请按 Enter 后重试。", ChatTag, ChatTagColor);
                 return;
             }
 
@@ -894,7 +896,7 @@ internal sealed class Runtime : IDisposable
         catch (Exception exception)
         {
             Log.Error(exception, "Could not insert auto-translate entry {RowId}.", entry.RowId);
-            ChatGui.PrintError("[定型文快速筛选] 写入聊天框失败，详情已写入插件日志。");
+            ChatGui.PrintError("写入聊天框失败，详情已写入插件日志。", ChatTag, ChatTagColor);
         }
     }
 

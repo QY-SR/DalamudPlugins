@@ -22,6 +22,8 @@ using QToolKit.Core;
 
 internal sealed class Runtime : IDisposable
 {
+    private const string ChatTag = "QT";
+    private const ushort ChatTagColor = 17;
     private const string Command = "/ocmark";
     private const uint ChestColor = 0xFF48C8FF;
     private const uint CarrotColor = 0xFF42A5FF;
@@ -791,7 +793,7 @@ internal sealed class Runtime : IDisposable
     {
         if (gameObject.BaseId == 0)
         {
-            ChatGui.PrintError("该对象的 BaseId 为 0，暂时无法作为同类对象持久识别。请截图这一行的完整信息。", "新月标记");
+            ChatGui.PrintError("该对象的 BaseId 为 0，暂时无法作为同类对象持久识别。请截图这一行的完整信息。", ChatTag, ChatTagColor);
             return;
         }
 
@@ -810,7 +812,8 @@ internal sealed class Runtime : IDisposable
         var objectName = this.GetObjectName(gameObject);
         ChatGui.Print(
             $"已将{(objectName.Length == 0 ? "无名对象" : objectName)}（BaseId:{gameObject.BaseId}）设为{(kind == MarkerKind.Chest ? "宝箱" : "萝卜")}。",
-            "新月标记");
+            ChatTag,
+            ChatTagColor);
     }
 
     private void AnnounceNewObjects()
@@ -842,7 +845,7 @@ internal sealed class Runtime : IDisposable
         catch (Exception exception)
         {
             Log.Error(exception, "输出新月岛宝藏坐标失败。");
-            ChatGui.PrintError("无法输出该对象的地图坐标。", "新月标记");
+            ChatGui.PrintError("无法输出该对象的地图坐标。", ChatTag, ChatTagColor);
         }
     }
 
@@ -864,7 +867,11 @@ internal sealed class Runtime : IDisposable
         float distance)
     {
         var message = new SeStringBuilder()
-            .AddText($"[新月标记] {label}  距离 {distance:F1}m  （")
+            .AddText("[")
+            .AddUiForeground(ChatTagColor)
+            .AddText(ChatTag)
+            .AddUiForegroundOff()
+            .AddText($"] {label}  距离 {distance:F1}m  （")
             .Build();
         var coordinateLink = SeString.CreateMapLink(territoryId, mapId, mapX, mapY);
         var closingParenthesis = new SeStringBuilder()

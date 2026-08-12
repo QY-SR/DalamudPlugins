@@ -24,9 +24,9 @@ internal sealed unsafe class WhiteMageCureRedirectModule : IToolkitModule
 
     public string Id => "WhiteMageCureRedirect";
 
-    public string DisplayName => "White Mage Cure Redirect";
+    public string DisplayName => "白魔低等级救疗重定向";
 
-    public string Description => "Redirect Cure II to Cure while synced below its unlock level.";
+    public string Description => "低等级同步且尚未解锁救疗时，将救疗重定向为治疗。";
 
     public bool IsRunning => this.useActionHook.IsEnabled;
 

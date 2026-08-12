@@ -26,6 +26,8 @@ using QToolKit.Core;
 
 internal sealed class Runtime : IDisposable
 {
+    private const string ChatTag = "QT";
+    private const ushort ChatTagColor = 17;
     [PluginService] private static IDalamudPluginInterface PluginInterface { get; set; } = null!;
     [PluginService] private static ICommandManager CommandManager { get; set; } = null!;
     [PluginService] private static IContextMenu ContextMenu { get; set; } = null!;
@@ -143,7 +145,7 @@ internal sealed class Runtime : IDisposable
                 || !uint.TryParse(parts[2], out var quantity)
                 || quantity == 0)
             {
-                ChatGui.PrintError("用法：/isl create <物品ID> <数量>");
+                ChatGui.PrintError("用法：/isl create <物品ID> <数量>", ChatTag, ChatTagColor);
                 return;
             }
 
@@ -157,7 +159,7 @@ internal sealed class Runtime : IDisposable
                 this.ClearNativeFakeVisual(fakeItem.DisplayIndex);
             this.configuration.FakeItems.Clear();
             this.configuration.Save(PluginInterface);
-            ChatGui.Print("[背包格子锁] 已清除全部本地整蛊物品。");
+            ChatGui.Print("已清除全部本地整蛊物品。", ChatTag, ChatTagColor);
             return;
         }
 
@@ -168,21 +170,21 @@ internal sealed class Runtime : IDisposable
     {
         if (!ClientState.IsLoggedIn)
         {
-            ChatGui.PrintError("请登录角色后再生成本地整蛊物品。");
+            ChatGui.PrintError("请登录角色后再生成本地整蛊物品。", ChatTag, ChatTagColor);
             return;
         }
 
         var sheet = DataManager.GetExcelSheet<LuminaItem>();
         if (itemId == 0 || !sheet.TryGetRow(itemId, out var row))
         {
-            ChatGui.PrintError($"找不到物品 ID {itemId}。");
+            ChatGui.PrintError($"找不到物品 ID {itemId}。", ChatTag, ChatTagColor);
             return;
         }
 
         var name = row.Name.ToString();
         if (string.IsNullOrWhiteSpace(name))
         {
-            ChatGui.PrintError($"找不到物品 ID {itemId}。");
+            ChatGui.PrintError($"找不到物品 ID {itemId}。", ChatTag, ChatTagColor);
             return;
         }
 
@@ -197,7 +199,7 @@ internal sealed class Runtime : IDisposable
             return;
         }
 
-        ChatGui.PrintError("没有可用于显示整蛊物品的空格。");
+        ChatGui.PrintError("没有可用于显示整蛊物品的空格。", ChatTag, ChatTagColor);
     }
 
     private void RemoveFakeItem(int displayIndex)
@@ -498,7 +500,7 @@ internal sealed class Runtime : IDisposable
             && slot <= ushort.MaxValue
             && this.IsProtectedPhysicalSlot(inventoryType, (ushort)slot))
         {
-            ChatGui.PrintError("该道具已被保护，不能出售或上交任务。");
+            ChatGui.PrintError("该道具已被保护，不能出售或上交任务。", ChatTag, ChatTagColor);
             Log.Debug("已阻止锁定道具进入商店/任务：{Container}/{Slot}", inventoryType, slot);
             return;
         }

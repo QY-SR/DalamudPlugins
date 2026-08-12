@@ -1,16 +1,9 @@
 # QToolKit
 
-QToolKit combines six standalone Dalamud plugins into independently toggleable modules:
+QToolKit 是一个模块化卫月插件合集，将常用功能集中到统一入口中管理。
 
-- Combat Model Blocker
-- Crescent Markers
-- White Mage Cure Redirect
-- Inventory Slot Lock
-- Quick Auto Translate
-- Inventory Search
+使用 `/qtk` 打开合集主界面。各模块可以按需启用或停用，并保留各自的独立设置入口。
 
-Use `/qtk` to open the module hub. Existing module commands remain available while their module is enabled.
+首次启动时，QToolKit 会导入可用的旧版配置与数据；原文件不会删除，可用于回退。启用合集中的模块前，请先停用对应的独立插件，避免命令或 Hook 冲突。
 
-On first launch, QToolKit imports available standalone configuration files into its unified configuration. Source files are never deleted. Disable the matching standalone plugin before enabling a QToolKit module to avoid command and hook conflicts.
-
-Discord verification is intentionally not implemented in this release.
+Discord 验证功能暂未加入。

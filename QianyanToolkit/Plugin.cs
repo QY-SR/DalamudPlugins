@@ -43,6 +43,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LegacyMigrationService migrationService;
     private IReadOnlyList<string> migrationResults = Array.Empty<string>();
     private bool windowOpen;
+    private int selectedPage;
 
     public Plugin()
     {
@@ -75,7 +76,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(Command, new CommandInfo(this.OnCommand)
         {
-            HelpMessage = "Open QToolKit.",
+            HelpMessage = "打开 QToolKit。",
             ShowInHelp = true,
         });
         PluginInterface.UiBuilder.Draw += this.Draw;
@@ -95,20 +96,20 @@ public sealed class Plugin : IDalamudPlugin
     private void RegisterModules()
     {
         this.moduleHost.Register(new RuntimeModule<CombatRuntime>(
-            "CombatModelBlocker", "Combat Model Blocker", "Hide non-party player models using the original /cmb module.",
+            "CombatModelBlocker", "战斗模型屏蔽", "按规则隐藏非小队玩家模型，保留原有 /cmb 设置入口。",
             () => new CombatRuntime(this.context, this.configuration.CombatModelBlocker), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new RuntimeModule<CrescentRuntime>(
-            "CrescentMarkers", "Crescent Markers", "Track Crescent Isle chests and carrots using /ocmark.",
+            "CrescentMarkers", "新月岛宝藏标记", "记录并标记新月岛宝箱与胡萝卜，保留原有 /ocmark 设置入口。",
             () => new CrescentRuntime(this.context, this.configuration.CrescentMarkers), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new Modules.WhiteMageCureRedirectModule(this.context));
         this.moduleHost.Register(new RuntimeModule<SlotLockRuntime>(
-            "InventorySlotLock", "Inventory Slot Lock", "Protect inventory slots and local fake items using /isl.",
+            "InventorySlotLock", "背包格子锁", "保护指定背包格子并管理本地幽灵物品，保留原有 /isl 设置入口。",
             () => new SlotLockRuntime(this.context, this.configuration.InventorySlotLock), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new RuntimeModule<TranslateRuntime>(
-            "QuickAutoTranslate", "Quick Auto Translate", "Search auto-translate phrases and historical actions using /qat.",
+            "QuickAutoTranslate", "定型文快速筛选", "通过中文或拼音检索定型文与历史技能，保留原有 /qat 设置入口。",
             () => new TranslateRuntime(this.context, this.configuration.QuickAutoTranslate), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new RuntimeModule<SearchRuntime>(
-            "InventorySearch", "Inventory Search", "Search and organize saved inventory snapshots using /ebsearch.",
+            "InventorySearch", "增强背包搜索", "检索并整理保存的库存快照，保留原有 /ebsearch 设置入口。",
             () => new SearchRuntime(this.context, this.configuration.InventorySearch), runtime => runtime.OpenWindow()));
     }
 
@@ -119,60 +120,124 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (!this.windowOpen)
             return;
-        ImGui.SetNextWindowSize(new Vector2(720f, 590f), ImGuiCond.FirstUseEver);
+        ImGui.SetNextWindowSize(new Vector2(820f, 560f), ImGuiCond.FirstUseEver);
         if (!ImGui.Begin("QToolKit###QToolKit", ref this.windowOpen))
         {
             ImGui.End();
             return;
         }
 
+        ImGui.TextColored(new Vector4(0.96f, 0.22f, 0.26f, 1f), "QT");
+        ImGui.SameLine();
         ImGui.TextUnformatted("QToolKit");
-        ImGui.TextDisabled("Standalone plugin data is imported without deleting the original files.");
-        ImGui.TextWrapped("Disable each standalone plugin before enabling its QToolKit module to avoid command and hook conflicts.");
+        ImGui.SameLine();
+        ImGui.TextDisabled("模块化插件合集");
         ImGui.Separator();
 
-        foreach (var module in this.moduleHost.Modules)
+        var availableHeight = ImGui.GetContentRegionAvail().Y;
+        if (ImGui.BeginChild("qtk-navigation", new Vector2(220f, availableHeight), true))
         {
-            ImGui.PushID(module.Id);
-            var enabled = module.IsRunning;
-            if (ImGui.Checkbox(module.DisplayName, ref enabled))
+            ImGui.TextDisabled("功能模块");
+            ImGui.Spacing();
+            for (var index = 0; index < this.moduleHost.Modules.Count; index++)
             {
-                try
-                {
-                    if (enabled)
-                        module.Start();
-                    else
-                        module.Stop();
-                    this.configuration.SetModuleEnabled(module.Id, enabled);
-                    this.configuration.Save(PluginInterface);
-                }
-                catch (Exception exception)
-                {
-                    Log.Error(exception, $"Failed to change module state for {module.Id}.");
-                    this.configuration.SetModuleEnabled(module.Id, module.IsRunning);
-                    this.configuration.Save(PluginInterface);
-                }
+                var module = this.moduleHost.Modules[index];
+                ImGui.TextColored(module.IsRunning
+                    ? new Vector4(0.30f, 0.82f, 0.48f, 1f)
+                    : new Vector4(0.48f, 0.50f, 0.54f, 1f), "●");
+                ImGui.SameLine();
+                if (ImGui.Selectable(module.DisplayName, this.selectedPage == index, ImGuiSelectableFlags.None, new Vector2(0f, 30f)))
+                    this.selectedPage = index;
             }
-            ImGui.SameLine();
-            ImGui.TextDisabled(module.IsRunning ? "Running" : "Disabled");
-            ImGui.TextWrapped(module.Description);
-            module.DrawSettings();
+            ImGui.Spacing();
             ImGui.Separator();
-            ImGui.PopID();
+            if (ImGui.Selectable("数据迁移", this.selectedPage == this.moduleHost.Modules.Count, ImGuiSelectableFlags.None, new Vector2(0f, 30f)))
+                this.selectedPage = this.moduleHost.Modules.Count;
+        }
+        ImGui.EndChild();
+
+        ImGui.SameLine();
+        if (ImGui.BeginChild("qtk-content", Vector2.Zero, true))
+        {
+            if (this.selectedPage >= 0 && this.selectedPage < this.moduleHost.Modules.Count)
+                this.DrawModulePage(this.moduleHost.Modules[this.selectedPage]);
+            else
+                this.DrawMigrationPage();
+        }
+        ImGui.EndChild();
+        ImGui.End();
+    }
+
+    private void DrawModulePage(IToolkitModule module)
+    {
+        ImGui.TextUnformatted(module.DisplayName);
+        ImGui.TextDisabled(module.Id);
+        ImGui.Spacing();
+        ImGui.TextWrapped(module.Description);
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
+        ImGui.TextUnformatted("模块状态");
+        ImGui.SameLine();
+        ImGui.TextColored(module.IsRunning
+            ? new Vector4(0.30f, 0.82f, 0.48f, 1f)
+            : new Vector4(0.62f, 0.64f, 0.68f, 1f), module.IsRunning ? "运行中" : "已停用");
+
+        var enabled = module.IsRunning;
+        if (ImGui.Checkbox("启用此模块", ref enabled))
+            this.SetModuleState(module, enabled);
+
+        if (module.IsRunning)
+        {
+            ImGui.Spacing();
+            module.DrawSettings();
         }
 
-        if (ImGui.CollapsingHeader("Legacy Data Migration"))
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.TextWrapped("启用合集模块前，请先在卫月插件安装器中停用对应的独立插件，避免命令或 Hook 冲突。");
+    }
+
+    private void SetModuleState(IToolkitModule module, bool enabled)
+    {
+        try
         {
-            foreach (var pair in this.configuration.Migrations)
-                ImGui.BulletText($"{pair.Key}: {pair.Value.Summary}");
-            foreach (var result in this.migrationResults)
-                ImGui.TextDisabled(result);
-            if (ImGui.Button("Import legacy data again"))
-            {
-                this.migrationResults = this.migrationService.ImportAvailable(this.configuration, true);
-                this.configuration.AttachSaveActions(PluginInterface);
-            }
+            if (enabled)
+                module.Start();
+            else
+                module.Stop();
+            this.configuration.SetModuleEnabled(module.Id, enabled);
         }
-        ImGui.End();
+        catch (Exception exception)
+        {
+            Log.Error(exception, $"切换模块 {module.Id} 状态失败。");
+            this.configuration.SetModuleEnabled(module.Id, module.IsRunning);
+        }
+        this.configuration.Save(PluginInterface);
+    }
+
+    private void DrawMigrationPage()
+    {
+        ImGui.TextUnformatted("旧版数据迁移");
+        ImGui.TextWrapped("QToolKit 会读取独立插件的旧配置并保存到合集配置中，原文件始终保留，不会自动删除。");
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        foreach (var pair in this.configuration.Migrations)
+        {
+            ImGui.TextColored(new Vector4(0.30f, 0.82f, 0.48f, 1f), "✓");
+            ImGui.SameLine();
+            ImGui.TextUnformatted(pair.Key);
+            ImGui.TextDisabled(pair.Value.Summary);
+        }
+        foreach (var result in this.migrationResults)
+            ImGui.TextDisabled(result);
+        ImGui.Spacing();
+        if (ImGui.Button("重新导入旧版数据"))
+        {
+            this.migrationResults = this.migrationService.ImportAvailable(this.configuration, true);
+            this.configuration.AttachSaveActions(PluginInterface);
+        }
     }
 }

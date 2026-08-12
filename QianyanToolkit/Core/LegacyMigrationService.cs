@@ -30,8 +30,8 @@ internal sealed class LegacyMigrationService
         if (!target.Migrations.ContainsKey("WhiteMageCureRedirect"))
         {
             target.Migrations["WhiteMageCureRedirect"] = new MigrationRecord(
-                "No configuration file", DateTime.UtcNow, "No persistent data to import");
-            results.Add("WhiteMageCureRedirect: no persistent data");
+                "无配置文件", DateTime.UtcNow, "没有需要迁移的持久数据");
+            results.Add("WhiteMageCureRedirect：无需迁移持久数据");
         }
 
         target.AttachSaveActions(this.pluginInterface);
@@ -51,7 +51,7 @@ internal sealed class LegacyMigrationService
         var source = Path.Combine(root, id + ".json");
         if (!File.Exists(source))
         {
-            results.Add($"{id}: legacy configuration not found");
+            results.Add($"{id}：未找到旧版配置");
             return;
         }
 
@@ -61,13 +61,13 @@ internal sealed class LegacyMigrationService
             if (imported == null)
                 throw new InvalidDataException("Configuration deserialized to null.");
             assign(imported);
-            target.Migrations[id] = new MigrationRecord(source, DateTime.UtcNow, "Imported successfully; source preserved");
-            results.Add($"{id}: imported");
+            target.Migrations[id] = new MigrationRecord(source, DateTime.UtcNow, "导入成功，原文件已保留");
+            results.Add($"{id}：已导入");
         }
         catch (Exception exception)
         {
             this.log.Error(exception, $"Failed to import legacy configuration for {id}.");
-            results.Add($"{id}: import failed");
+            results.Add($"{id}：导入失败");
         }
     }
 }
