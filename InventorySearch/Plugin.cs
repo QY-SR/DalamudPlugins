@@ -36,7 +36,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private static ICondition Condition { get; set; } = null!;
     [PluginService] private static IPluginLog Log { get; set; } = null!;
 
-    private const string Command = "/isearch";
+    private const string Command = "/ebsearch";
     private static readonly InventoryType[] InventoryPages =
     [
         InventoryType.Inventory1, InventoryType.Inventory2,
@@ -66,6 +66,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Queue<BatchWithdrawalItem> batchWithdrawalQueue = new();
     private readonly Dictionary<string, BatchDepositItem> selectedDeposits = new();
     private readonly Queue<BatchDepositItem> batchDepositQueue = new();
+    private readonly Dictionary<string, OrganizerSuggestion> selectedOrganizerSuggestions = new();
+    private readonly Queue<OrganizerSuggestion> organizerQueue = new();
     private bool windowOpen;
     private string search = string.Empty;
     private string selectedCharacter = "全部角色";
@@ -83,6 +85,10 @@ public sealed class Plugin : IDalamudPlugin
     private bool batchDepositActive;
     private int batchDepositCompleted;
     private int batchDepositSkipped;
+    private bool organizerActive;
+    private OrganizerSuggestion? currentOrganizerSuggestion;
+    private int organizerCompleted;
+    private int organizerSkipped;
 
     public Plugin()
     {
@@ -131,6 +137,9 @@ public sealed class Plugin : IDalamudPlugin
             this.batchWithdrawalActive = false;
             this.batchDepositQueue.Clear();
             this.batchDepositActive = false;
+            this.organizerQueue.Clear();
+            this.organizerActive = false;
+            this.currentOrganizerSuggestion = null;
             this.lastContentId = 0;
             this.status = "等待角色登录";
             return;
@@ -182,7 +191,11 @@ public sealed class Plugin : IDalamudPlugin
         return true;
     }
 
-    private void BeginWithdrawal(SearchResult result, int quantity, bool closeAfterMove = false)
+    private unsafe void BeginWithdrawal(
+        SearchResult result,
+        int quantity,
+        bool closeAfterMove = false,
+        bool organizerMode = false)
     {
         if (!this.CanStartWithdrawal(result, quantity, out var reason))
         {
@@ -204,6 +217,10 @@ public sealed class Plugin : IDalamudPlugin
             SourceSlot = (ushort)result.Item.Slot,
             ItemName = result.Item.Name,
             CloseAfterMove = closeAfterMove,
+            OrganizerMode = organizerMode,
+            InventoryBeforeMove = organizerMode
+                ? this.CaptureMatchingInventoryQuantities(result.Item.ItemId, result.Item.IsHq)
+                : [],
             Stage = WithdrawalStage.OpenBell,
             DeadlineTick = now + 45_000,
             NextActionTick = now,
@@ -274,6 +291,70 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private unsafe Dictionary<InventorySlotKey, uint> CaptureMatchingInventoryQuantities(uint itemId, bool isHq)
+    {
+        var quantities = new Dictionary<InventorySlotKey, uint>();
+        var manager = InventoryManager.Instance();
+        if (manager == null)
+            return quantities;
+        foreach (var type in InventoryPages)
+        {
+            var container = manager->GetInventoryContainer(type);
+            if (container == null || !container->IsLoaded)
+                continue;
+            for (ushort slot = 0; slot < container->Size; slot++)
+            {
+                var item = container->GetInventorySlot(slot);
+                quantities[new InventorySlotKey(type, slot)] = GetMatchingQuantity(item, itemId, isHq);
+            }
+        }
+        return quantities;
+    }
+
+    private unsafe bool TryFindReceivedInventorySlot(
+        WithdrawalRequest request,
+        out InventoryType containerType,
+        out ushort slot,
+        out uint quantity)
+    {
+        containerType = default;
+        slot = 0;
+        quantity = 0;
+        var manager = InventoryManager.Instance();
+        if (manager == null)
+            return false;
+        foreach (var type in InventoryPages)
+        {
+            var container = manager->GetInventoryContainer(type);
+            if (container == null || !container->IsLoaded)
+                continue;
+            for (ushort currentSlot = 0; currentSlot < container->Size; currentSlot++)
+            {
+                var currentQuantity = GetMatchingQuantity(
+                    container->GetInventorySlot(currentSlot), request.ItemId, request.IsHq);
+                request.InventoryBeforeMove.TryGetValue(new InventorySlotKey(type, currentSlot), out var previousQuantity);
+                if (currentQuantity >= previousQuantity
+                    && currentQuantity - previousQuantity == request.RequestedQuantity)
+                {
+                    containerType = type;
+                    slot = currentSlot;
+                    quantity = currentQuantity;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private unsafe bool TryConfirmOperationDialog()
+    {
+        var addon = GameGui.GetAddonByName<AtkUnitBase>("SelectYesno");
+        if (addon == null || !addon->IsVisible || !addon->IsReady)
+            return false;
+        addon->FireCallbackInt(0);
+        return true;
+    }
+
     private unsafe void ProcessWithdrawal(long now)
     {
         var request = this.withdrawal;
@@ -296,6 +377,11 @@ public sealed class Plugin : IDalamudPlugin
 
         try
         {
+            if (this.TryConfirmOperationDialog())
+            {
+                request.NextActionTick = now + 400;
+                return;
+            }
             var retainerManager = RetainerManager.Instance();
             var activeRetainer = retainerManager == null ? null : retainerManager->GetActiveRetainer();
 
@@ -518,6 +604,26 @@ public sealed class Plugin : IDalamudPlugin
                     }
 
                     this.ScanNow(true);
+                    if (request.OrganizerMode)
+                    {
+                        if (!this.TryFindReceivedInventorySlot(
+                                request,
+                                out var receivedContainer,
+                                out var receivedSlot,
+                                out var receivedQuantity))
+                        {
+                            this.FailWithdrawal("已取出道具，但无法确认其角色背包格，跨雇员整理已停止");
+                            return;
+                        }
+                        request.ReceivedContainer = receivedContainer;
+                        request.ReceivedSlot = receivedSlot;
+                        request.ReceivedQuantity = receivedQuantity;
+                        request.MoveCompleted = true;
+                        request.Stage = WithdrawalStage.CloseInventory;
+                        request.NextActionTick = now + 500;
+                        this.status = "已取出道具，正在切换到目标雇员……";
+                        return;
+                    }
                     if (!request.CloseAfterMove)
                     {
                         this.withdrawal = null;
@@ -582,8 +688,16 @@ public sealed class Plugin : IDalamudPlugin
                         request.NextActionTick = now + 200;
                         return;
                     }
-                    this.withdrawal = null;
-                    this.StartNextBatchWithdrawal();
+                    if (request.OrganizerMode)
+                    {
+                        this.withdrawal = null;
+                        this.StartOrganizerDeposit(request);
+                    }
+                    else
+                    {
+                        this.withdrawal = null;
+                        this.StartNextBatchWithdrawal();
+                    }
                     return;
             }
         }
@@ -603,7 +717,109 @@ public sealed class Plugin : IDalamudPlugin
             this.batchWithdrawalActive = false;
             message += "；批量队列已停止";
         }
+        if (this.organizerActive)
+        {
+            this.organizerQueue.Clear();
+            this.organizerActive = false;
+            this.currentOrganizerSuggestion = null;
+            message += "；跨雇员整理已停止";
+        }
         this.status = message;
+    }
+
+    private void StartOrganizer()
+    {
+        if (this.withdrawal != null || this.deposit != null || this.batchWithdrawalActive
+            || this.batchDepositActive || this.organizerActive)
+        {
+            this.status = "已有一项雇员物品操作正在进行";
+            return;
+        }
+        if (!ClientState.IsLoggedIn || !PlayerState.IsLoaded || this.FindNearbySummoningBell() == null)
+        {
+            this.status = "跨雇员整理需要登录对应角色并站在传唤铃交互范围内";
+            return;
+        }
+
+        this.organizerQueue.Clear();
+        var currentContentId = PlayerState.ContentId;
+        var selected = this.selectedOrganizerSuggestions.Values
+            .Where(entry => entry.Character.ContentId == currentContentId)
+            .OrderBy(entry => entry.SourceStorage.OwnerId)
+            .ThenBy(entry => entry.TargetStorage.OwnerId)
+            .ThenBy(entry => entry.SourceItem.Container)
+            .ThenBy(entry => entry.SourceItem.Slot)
+            .ToList();
+        this.organizerSkipped = this.selectedOrganizerSuggestions.Count - selected.Count;
+        foreach (var suggestion in selected)
+        {
+            if (suggestion.Quantity < 1 || suggestion.Quantity > suggestion.SourceItem.Quantity
+                || suggestion.TargetItem.Quantity >= suggestion.StackSize
+                || suggestion.Quantity > suggestion.StackSize - suggestion.TargetItem.Quantity)
+            {
+                this.organizerSkipped++;
+                continue;
+            }
+            this.organizerQueue.Enqueue(suggestion);
+        }
+        if (this.organizerQueue.Count == 0)
+        {
+            this.status = "没有可执行的当前角色跨雇员整理建议";
+            return;
+        }
+
+        this.selectedOrganizerSuggestions.Clear();
+        this.organizerActive = true;
+        this.organizerCompleted = 0;
+        this.StartNextOrganizerItem();
+    }
+
+    private void StartNextOrganizerItem()
+    {
+        if (!this.organizerActive)
+            return;
+        if (!this.organizerQueue.TryDequeue(out var suggestion))
+        {
+            this.organizerActive = false;
+            this.currentOrganizerSuggestion = null;
+            this.status = $"跨雇员整理完成：成功 {this.organizerCompleted} 条，跳过 {this.organizerSkipped} 条";
+            return;
+        }
+
+        this.currentOrganizerSuggestion = suggestion;
+        var source = new SearchResult(suggestion.Character, suggestion.SourceStorage, suggestion.SourceItem);
+        this.BeginWithdrawal(source, (int)suggestion.Quantity, true, true);
+        if (this.withdrawal == null)
+        {
+            this.organizerQueue.Clear();
+            this.organizerActive = false;
+            this.currentOrganizerSuggestion = null;
+            this.status += "；跨雇员整理已停止";
+        }
+    }
+
+    private void StartOrganizerDeposit(WithdrawalRequest withdrawalRequest)
+    {
+        if (!this.organizerActive || this.currentOrganizerSuggestion is not { } suggestion)
+            return;
+        var received = new StoredItem
+        {
+            ItemId = suggestion.SourceItem.ItemId,
+            Quantity = withdrawalRequest.ReceivedQuantity,
+            IsHq = suggestion.SourceItem.IsHq,
+            IconId = suggestion.SourceItem.IconId,
+            Name = suggestion.SourceItem.Name,
+            Container = (uint)withdrawalRequest.ReceivedContainer,
+            Slot = withdrawalRequest.ReceivedSlot,
+        };
+        var result = new StackableResult(
+            suggestion.Character,
+            received,
+            suggestion.TargetStorage,
+            suggestion.TargetItem,
+            suggestion.StackSize,
+            suggestion.Quantity);
+        this.BeginDeposit(result, (int)suggestion.Quantity, organizerMode: true);
     }
 
     private unsafe bool CanStartDeposit(StackableResult result, int quantity, out string reason)
@@ -646,7 +862,8 @@ public sealed class Plugin : IDalamudPlugin
         int quantity,
         bool batchMode = false,
         uint? targetExpectedQuantity = null,
-        uint? sourceExpectedQuantity = null)
+        uint? sourceExpectedQuantity = null,
+        bool organizerMode = false)
     {
         if (!this.CanStartDeposit(result, quantity, out var reason))
         {
@@ -672,6 +889,7 @@ public sealed class Plugin : IDalamudPlugin
             StackSize = result.StackSize,
             ItemName = result.SourceItem.Name,
             BatchMode = batchMode,
+            OrganizerMode = organizerMode,
             Stage = DepositStage.OpenBell,
             DeadlineTick = now + 45_000,
             NextActionTick = now,
@@ -796,6 +1014,11 @@ public sealed class Plugin : IDalamudPlugin
 
         try
         {
+            if (this.TryConfirmOperationDialog())
+            {
+                request.NextActionTick = now + 400;
+                return;
+            }
             var retainerManager = RetainerManager.Instance();
             var activeRetainer = retainerManager == null ? null : retainerManager->GetActiveRetainer();
             switch (request.Stage)
@@ -1068,17 +1291,31 @@ public sealed class Plugin : IDalamudPlugin
             this.batchDepositActive = false;
             message += "；批量队列已停止";
         }
+        if (this.organizerActive)
+        {
+            this.organizerQueue.Clear();
+            this.organizerActive = false;
+            this.currentOrganizerSuggestion = null;
+            message += "；跨雇员整理已停止";
+        }
         this.status = message;
     }
 
     private void CompleteDeposit(string message)
     {
+        var organizerMode = this.deposit?.OrganizerMode == true;
         this.deposit = null;
         this.organizerHint = null;
         this.status = message;
         this.ScanNow(true);
         if (this.batchDepositActive)
             this.StartNextBatchDeposit();
+        else if (organizerMode && this.organizerActive)
+        {
+            this.organizerCompleted++;
+            this.currentOrganizerSuggestion = null;
+            this.StartNextOrganizerItem();
+        }
     }
 
     private unsafe int FindSortedRetainerIndex(RetainerManager* manager, ulong retainerId)
@@ -1549,7 +1786,22 @@ public sealed class Plugin : IDalamudPlugin
             .Take(1000)
             .ToList();
 
-        ImGui.TextDisabled($"找到 {suggestions.Count} 条跨雇员合并建议；每次先取出，再到“可堆叠物品”确认存入目标");
+        ImGui.TextUnformatted($"已勾选 {this.selectedOrganizerSuggestions.Count} 条 · 使用建议数量自动合并");
+        ImGui.SameLine();
+        var canStartOrganizer = this.selectedOrganizerSuggestions.Count > 0
+            && this.withdrawal == null && this.deposit == null
+            && !this.batchWithdrawalActive && !this.batchDepositActive && !this.organizerActive;
+        ImGui.BeginDisabled(!canStartOrganizer);
+        if (ImGui.Button("自动合并勾选项"))
+            this.StartOrganizer();
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        ImGui.BeginDisabled(this.selectedOrganizerSuggestions.Count == 0 || this.organizerActive);
+        if (ImGui.Button("清除整理勾选"))
+            this.selectedOrganizerSuggestions.Clear();
+        ImGui.EndDisabled();
+
+        ImGui.TextDisabled($"找到 {suggestions.Count} 条跨雇员合并建议；勾选后自动完成来源取出与目标存入");
         if (!ImGui.BeginChild("organizer-results", Vector2.Zero, true))
         {
             ImGui.EndChild();
@@ -1557,7 +1809,17 @@ public sealed class Plugin : IDalamudPlugin
         }
         foreach (var suggestion in suggestions)
         {
-            ImGui.PushID($"organize:{suggestion.Character.ContentId}:{suggestion.SourceStorage.OwnerId}:{suggestion.SourceItem.Container}:{suggestion.SourceItem.Slot}:{suggestion.TargetStorage.OwnerId}");
+            var suggestionKey = OrganizerKey(suggestion);
+            ImGui.PushID(suggestionKey);
+            var selected = this.selectedOrganizerSuggestions.ContainsKey(suggestionKey);
+            if (ImGui.Checkbox("##organizerSelect", ref selected))
+            {
+                if (selected)
+                    this.selectedOrganizerSuggestions[suggestionKey] = suggestion;
+                else
+                    this.selectedOrganizerSuggestions.Remove(suggestionKey);
+            }
+            ImGui.SameLine();
             var texture = this.GetIcon(suggestion.SourceItem.IconId);
             if (texture.TryGetWrap(out var wrap, out _))
             {
@@ -1569,16 +1831,15 @@ public sealed class Plugin : IDalamudPlugin
             ImGui.TextDisabled($"{suggestion.SourceStorage.OwnerName} {Location(StorageKind.Retainer, suggestion.SourceItem)}  →  {suggestion.TargetStorage.OwnerName} {suggestion.TargetItem.Quantity}/{suggestion.StackSize}");
             ImGui.EndGroup();
             var sourceResult = new SearchResult(suggestion.Character, suggestion.SourceStorage, suggestion.SourceItem);
-            var canStart = this.CanStartWithdrawal(sourceResult, (int)suggestion.Quantity, out var reason);
+            var canStart = this.CanStartWithdrawal(sourceResult, (int)suggestion.Quantity, out var reason)
+                && !this.organizerActive && !this.batchWithdrawalActive && !this.batchDepositActive;
             ImGui.SameLine();
             ImGui.BeginDisabled(!canStart);
-            if (ImGui.Button("取出用于合并"))
+            if (ImGui.Button("自动合并"))
             {
-                this.organizerHint = new OrganizerHint(suggestion.SourceItem.ItemId, suggestion.SourceItem.IsHq, suggestion.TargetStorage.OwnerId);
-                this.BeginWithdrawal(sourceResult, (int)suggestion.Quantity);
-                this.selectedKind = 7;
-                this.showOrganizer = false;
-                this.search = suggestion.SourceItem.Name;
+                this.selectedOrganizerSuggestions.Clear();
+                this.selectedOrganizerSuggestions[suggestionKey] = suggestion;
+                this.StartOrganizer();
             }
             ImGui.EndDisabled();
             if (!canStart && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
@@ -1786,6 +2047,8 @@ public sealed class Plugin : IDalamudPlugin
     private bool KindMatches(StorageKind kind) => this.selectedKind == 0 || (int)kind == this.selectedKind - 1;
     private static string ResultKey(SearchResult result)
         => $"{result.Character.ContentId}:{result.Storage.Key}:{result.Item.Container}:{result.Item.Slot}";
+    private static string OrganizerKey(OrganizerSuggestion suggestion)
+        => $"organize:{suggestion.Character.ContentId}:{suggestion.SourceStorage.OwnerId}:{suggestion.SourceItem.Container}:{suggestion.SourceItem.Slot}:{suggestion.TargetStorage.OwnerId}:{suggestion.TargetItem.Container}:{suggestion.TargetItem.Slot}";
     private static string CharacterLabel(CharacterSnapshot character)
         => string.IsNullOrWhiteSpace(character.World) ? character.Name : $"{character.Name} @ {character.World}";
     private static string OwnerSuffix(StorageSnapshot storage)
@@ -1860,6 +2123,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private sealed record OrganizerHint(uint ItemId, bool IsHq, ulong TargetRetainerId);
 
+    private readonly record struct InventorySlotKey(InventoryType Container, ushort Slot);
+
     private sealed class WithdrawalRequest
     {
         public ulong CharacterContentId { get; init; }
@@ -1873,6 +2138,11 @@ public sealed class Plugin : IDalamudPlugin
         public ushort SourceSlot { get; init; }
         public string ItemName { get; init; } = string.Empty;
         public bool CloseAfterMove { get; init; }
+        public bool OrganizerMode { get; init; }
+        public Dictionary<InventorySlotKey, uint> InventoryBeforeMove { get; init; } = [];
+        public InventoryType ReceivedContainer { get; set; }
+        public ushort ReceivedSlot { get; set; }
+        public uint ReceivedQuantity { get; set; }
         public WithdrawalStage Stage { get; set; }
         public long DeadlineTick { get; init; }
         public long NextActionTick { get; set; }
@@ -1897,6 +2167,7 @@ public sealed class Plugin : IDalamudPlugin
         public uint StackSize { get; init; }
         public string ItemName { get; init; } = string.Empty;
         public bool BatchMode { get; init; }
+        public bool OrganizerMode { get; init; }
         public DepositStage Stage { get; set; }
         public long DeadlineTick { get; init; }
         public long NextActionTick { get; set; }
