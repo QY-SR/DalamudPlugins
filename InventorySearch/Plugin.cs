@@ -1527,13 +1527,15 @@ public sealed class Plugin : IDalamudPlugin
             var manager = InventoryManager.Instance();
             if (manager != null)
             {
-                changed |= this.ScanContainers(character, "inventory", StorageKind.Inventory, "角色背包", 0, InventoryPages);
+                changed |= this.ScanContainers(character, "inventory", StorageKind.Inventory, "角色背包", 0, InventoryPages, true);
                 changed |= this.ScanContainers(character, "saddlebag", StorageKind.Saddlebag, "陆行鸟鞍囊", 0, SaddlebagPages);
                 changed |= this.ScanContainers(character, "premium-saddlebag", StorageKind.PremiumSaddlebag, "高级陆行鸟鞍囊", 0, PremiumSaddlebagPages);
 
                 var retainers = RetainerManager.Instance();
                 var active = retainers == null ? null : retainers->GetActiveRetainer();
-                if (active != null && active->RetainerId != 0)
+                if (Condition[ConditionFlag.OccupiedSummoningBell]
+                    && this.IsRetainerInventoryVisible()
+                    && active != null && active->RetainerId != 0)
                 {
                     var retainerName = active->NameString;
                     changed |= this.ScanContainers(
@@ -1542,7 +1544,8 @@ public sealed class Plugin : IDalamudPlugin
                         StorageKind.Retainer,
                         string.IsNullOrWhiteSpace(retainerName) ? "未命名雇员" : retainerName,
                         active->RetainerId,
-                        RetainerPages);
+                        RetainerPages,
+                        true);
                 }
             }
 
@@ -1586,7 +1589,8 @@ public sealed class Plugin : IDalamudPlugin
         StorageKind kind,
         string ownerName,
         ulong ownerId,
-        IReadOnlyList<InventoryType> pages)
+        IReadOnlyList<InventoryType> pages,
+        bool requireAllPages = false)
     {
         var manager = InventoryManager.Instance();
         if (manager == null)
@@ -1597,9 +1601,11 @@ public sealed class Plugin : IDalamudPlugin
         {
             var container = manager->GetInventoryContainer(page);
             if (container == null || !container->IsLoaded || container->Size <= 0)
-                return false;
+                continue;
             containers.Add((nint)container);
         }
+        if (containers.Count == 0 || requireAllPages && containers.Count != pages.Count)
+            return false;
 
         var items = new List<StoredItem>();
         foreach (var address in containers)
@@ -1626,7 +1632,32 @@ public sealed class Plugin : IDalamudPlugin
             }
         }
 
-        return this.ReplaceStorage(character, key, kind, ownerName, ownerId, items);
+        var loadedPages = containers
+            .Select(address => (uint)((InventoryContainer*)address)->Type)
+            .ToHashSet();
+        return this.MergeStoragePages(character, key, kind, ownerName, ownerId, loadedPages, items);
+    }
+
+    private bool MergeStoragePages(
+        CharacterSnapshot character,
+        string key,
+        StorageKind kind,
+        string ownerName,
+        ulong ownerId,
+        HashSet<uint> loadedPages,
+        List<StoredItem> loadedItems)
+    {
+        var storage = character.Storages.FirstOrDefault(entry => entry.Key == key);
+        var mergedItems = storage?.Items
+            .Where(item => !loadedPages.Contains(item.Container))
+            .Concat(loadedItems)
+            .OrderBy(item => item.Container)
+            .ThenBy(item => item.Slot)
+            .ToList() ?? loadedItems
+            .OrderBy(item => item.Container)
+            .ThenBy(item => item.Slot)
+            .ToList();
+        return this.ReplaceStorage(character, key, kind, ownerName, ownerId, mergedItems);
     }
 
     private unsafe bool ScanGlamourDresser(CharacterSnapshot character)
