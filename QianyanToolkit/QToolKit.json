@@ -1,0 +1,12 @@
+{
+  "Author": "QianyanSR",
+  "Name": "QToolKit",
+  "Punchline": "Six utilities in one modular plugin.",
+  "Description": "A modular collection containing Combat Model Blocker, Crescent Markers, White Mage Cure Redirect, Inventory Slot Lock, Quick Auto Translate, and Inventory Search. Supports importing data from the six standalone plugins.",
+  "InternalName": "QToolKit",
+  "AssemblyVersion": "1.0.0.0",
+  "ApplicableVersion": "any",
+  "IconUrl": "https://raw.githubusercontent.com/QY-SR/DalamudPlugins/main/assets/icons/QToolKit.png?v=20260812-qtk-1",
+  "DalamudApiLevel": 15,
+  "Tags": ["toolkit", "modules", "migration"]
+}
