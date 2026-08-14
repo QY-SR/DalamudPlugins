@@ -26,6 +26,7 @@ internal sealed class LegacyMigrationService
         this.Import<Modules.InventorySlotLock.Configuration>("InventorySlotLock", target, force, value => target.InventorySlotLock = value, results);
         this.Import<Modules.QuickAutoTranslate.Configuration>("QuickAutoTranslate", target, force, value => target.QuickAutoTranslate = value, results);
         this.Import<Modules.InventorySearch.Configuration>("InventorySearch", target, force, value => target.InventorySearch = value, results);
+        this.Import<Modules.JumpAssist.Configuration>("JumpAssist", target, force, value => target.JumpAssist = value, results);
 
         if (!target.Migrations.ContainsKey("WhiteMageCureRedirect"))
         {

@@ -7,7 +7,7 @@ namespace QToolKit;
 
 public sealed class Configuration : IPluginConfiguration
 {
-    public int Version { get; set; } = 2;
+    public int Version { get; set; } = 3;
     public Dictionary<string, bool> EnabledModules { get; set; } = new();
     public Dictionary<string, MigrationRecord> Migrations { get; set; } = new();
 
@@ -16,6 +16,7 @@ public sealed class Configuration : IPluginConfiguration
     public Modules.InventorySlotLock.Configuration InventorySlotLock { get; set; } = new();
     public Modules.QuickAutoTranslate.Configuration QuickAutoTranslate { get; set; } = new();
     public Modules.InventorySearch.Configuration InventorySearch { get; set; } = new();
+    public Modules.JumpAssist.Configuration JumpAssist { get; set; } = new();
 
     public bool IsModuleEnabled(string moduleId)
         => this.EnabledModules.TryGetValue(moduleId, out var enabled) && enabled;
@@ -31,6 +32,7 @@ public sealed class Configuration : IPluginConfiguration
         this.InventorySlotLock.SaveAction = Save;
         this.QuickAutoTranslate.SaveAction = Save;
         this.InventorySearch.SaveAction = Save;
+        this.JumpAssist.SaveAction = Save;
     }
 
     public void Save(IDalamudPluginInterface pluginInterface)

@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Keys;
 using Dalamud.Game.Command;
+using Dalamud.Game.Config;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -12,6 +14,7 @@ using CrescentRuntime = QToolKit.Modules.CrescentMarkers.Runtime;
 using SlotLockRuntime = QToolKit.Modules.InventorySlotLock.Runtime;
 using TranslateRuntime = QToolKit.Modules.QuickAutoTranslate.Runtime;
 using SearchRuntime = QToolKit.Modules.InventorySearch.Runtime;
+using JumpRuntime = QToolKit.Modules.JumpAssist.Runtime;
 
 namespace QToolKit;
 
@@ -35,12 +38,15 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] private static IGameGui GameGui { get; set; } = null!;
     [PluginService] private static ISeStringEvaluator SeStringEvaluator { get; set; } = null!;
     [PluginService] private static IPlayerState PlayerState { get; set; } = null!;
+    [PluginService] private static IGameConfig GameConfig { get; set; } = null!;
+    [PluginService] private static IKeyState KeyState { get; set; } = null!;
     [PluginService] private static IPluginLog Log { get; set; } = null!;
 
     private readonly Configuration configuration;
     private readonly ModuleContext context;
     private readonly ModuleHost moduleHost = new();
     private readonly LegacyMigrationService migrationService;
+    private readonly SelfUpdateService selfUpdateService;
     private IReadOnlyList<string> migrationResults = Array.Empty<string>();
     private bool windowOpen;
     private int selectedPage;
@@ -52,9 +58,10 @@ public sealed class Plugin : IDalamudPlugin
         this.context = new ModuleContext(
             PluginInterface, CommandManager, Framework, Condition, ObjectTable, PartyList,
             NamePlateGui, ContextMenu, ClientState, GameInteropProvider, DataManager,
-            TextureProvider, ChatGui, GameGui, SeStringEvaluator, PlayerState, Log);
+            TextureProvider, ChatGui, GameGui, SeStringEvaluator, PlayerState, GameConfig, KeyState, Log);
 
         this.migrationService = new LegacyMigrationService(PluginInterface, Log);
+        this.selfUpdateService = new SelfUpdateService(PluginInterface, Framework, Log);
         this.migrationResults = this.migrationService.ImportAvailable(this.configuration, false);
         this.RegisterModules();
 
@@ -111,13 +118,22 @@ public sealed class Plugin : IDalamudPlugin
         this.moduleHost.Register(new RuntimeModule<SearchRuntime>(
             "InventorySearch", "增强背包搜索", "1.5.3.0", "检索并整理保存的库存快照。", "/ebsearch：打开跨角色背包与收藏搜索窗口。\n/ebsearch refresh：立即刷新库存快照。",
             () => new SearchRuntime(this.context, this.configuration.InventorySearch), runtime => runtime.OpenWindow()));
+        this.moduleHost.Register(new RuntimeModule<JumpRuntime>(
+            "JumpAssist", "跳跳乐助手", "3.5.3.0", "观察落点、预览轨迹并辅助执行跳跃。", "/jumpassist：打开设置。\n/jumpassist observe：进入观察选点。\n/jumpassist go：执行跳跃。\n/jumpassist clear：清除目标。",
+            () => new JumpRuntime(this.context, this.configuration.JumpAssist), runtime => runtime.OpenWindow()));
     }
 
-    private void OnCommand(string _, string arguments) => this.windowOpen = true;
-    private void OpenWindow() => this.windowOpen = true;
+    private void OnCommand(string _, string arguments) => this.OpenWindow();
+
+    private void OpenWindow()
+    {
+        this.windowOpen = true;
+        this.selfUpdateService.CheckWhenOpened();
+    }
 
     private void Draw()
     {
+        this.selfUpdateService.Draw();
         if (!this.windowOpen)
             return;
         ImGui.SetNextWindowSize(new Vector2(820f, 560f), ImGuiCond.FirstUseEver);

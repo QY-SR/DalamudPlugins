@@ -1,5 +1,7 @@
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using Dalamud.Game.ClientState.Keys;
+using Dalamud.Game.Config;
 
 namespace QToolKit.Core;
 
@@ -20,4 +22,6 @@ internal sealed record ModuleContext(
     IGameGui GameGui,
     ISeStringEvaluator SeStringEvaluator,
     IPlayerState PlayerState,
+    IGameConfig GameConfig,
+    IKeyState KeyState,
     IPluginLog Log);
