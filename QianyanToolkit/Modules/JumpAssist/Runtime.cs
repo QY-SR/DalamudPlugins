@@ -60,6 +60,7 @@ internal sealed class Runtime : IDisposable
     private const float LandingLedgeCaptureAllowance = 0.42f;
     private const float MaximumReachableLandingRise = MaximumJumpRise + LandingLedgeCaptureAllowance;
     private const string UpdatePlayerWalkSpeedSignature = "40 53 48 83 EC 50 80 79 3C 00";
+    private const string ReadWalkInputSignature = "E8 ?? ?? ?? ?? 80 7B 3E 00 48 8D 3D";
     private const float TargetAdjustmentSpeed = 0.75f;
     private const float ObserverTargetSpeed = 2.50f;
     private const float PreciseTargetAdjustmentSpeed = 0.20f;
@@ -134,6 +135,16 @@ internal sealed class Runtime : IDisposable
     private IXbox360Controller? virtualGamepad;
     private bool virtualGamepadConnected;
     private Hook<UpdatePlayerWalkSpeedDelegate>? updatePlayerWalkSpeedHook;
+    private Hook<ReadWalkInputDelegate>? readWalkInputHook;
+    private bool nativeMovementActive;
+    private bool nativeDirectionDiagnosticPending;
+    private bool nativeDirectionDiagnosticLogged;
+    private bool lastInjectedLegacyMode;
+    private float lastInjectedWorldDegrees;
+    private float lastInjectedReferenceDegrees;
+    private float lastInjectedRelativeDegrees;
+    private float lastInjectedLeft;
+    private float lastInjectedForward;
     private Hook<GetCameraPositionDelegate>? getCameraPositionHook;
     private bool speedOverrideActive;
     private volatile bool speedOverrideApplied;
@@ -164,8 +175,6 @@ internal sealed class Runtime : IDisposable
         });
         Framework.Update += this.OnFrameworkUpdate;
         PluginInterface.UiBuilder.Draw += this.Draw;
-        if (!this.TryInitializeVirtualGamepad(out var gamepadError))
-            this.status = gamepadError;
     }
 
     public void Dispose()
@@ -176,6 +185,8 @@ internal sealed class Runtime : IDisposable
         this.getCameraPositionHook = null;
         this.updatePlayerWalkSpeedHook?.Dispose();
         this.updatePlayerWalkSpeedHook = null;
+        this.readWalkInputHook?.Dispose();
+        this.readWalkInputHook = null;
         this.DisposeVirtualGamepad();
         PluginInterface.UiBuilder.Draw -= this.Draw;
         Framework.Update -= this.OnFrameworkUpdate;
@@ -371,9 +382,24 @@ internal sealed class Runtime : IDisposable
             this.ReportStatus("尚未固定目标；请先将鼠标指向落点并执行 /jumpassist set。", notifyChat);
             return;
         }
-        if (!ClientState.IsLoggedIn || ClientState.IsPvP || ClientState.IsGPosing || !ClientState.IsClientIdle())
+        if (!ClientState.IsLoggedIn)
         {
-            this.ReportStatus("当前角色状态不允许执行。", notifyChat);
+            this.ReportStatus("当前角色尚未登录，不能执行跳跃。", notifyChat);
+            return;
+        }
+        if (ClientState.IsPvP)
+        {
+            this.ReportStatus("PvP 区域内不能执行跳跃。", notifyChat);
+            return;
+        }
+        if (ClientState.IsGPosing)
+        {
+            this.ReportStatus("集体动作模式中不能执行跳跃。", notifyChat);
+            return;
+        }
+        if (!ClientState.IsClientIdle(out var blockingFlag))
+        {
+            this.ReportStatus($"当前角色状态不允许执行：{blockingFlag}。", notifyChat);
             return;
         }
         if (Condition[ConditionFlag.Jumping] || Condition[ConditionFlag.InFlight] || Condition[ConditionFlag.Swimming])
@@ -495,6 +521,7 @@ internal sealed class Runtime : IDisposable
 
     private void UpdateAttempt()
     {
+        this.FlushNativeDirectionDiagnostic();
         var player = ObjectTable.LocalPlayer;
         if (player == null || !ClientState.IsLoggedIn)
         {
@@ -502,9 +529,9 @@ internal sealed class Runtime : IDisposable
             return;
         }
 
-        if (!this.targetArrivalHandled && !this.TryApplyVirtualMovement(1f))
+        if (!this.targetArrivalHandled && !this.TryApplyMovementDirection(1f))
         {
-            this.StopAttempt("虚拟手柄报告提交失败，已立即停止移动；请确认 ViGEmBus 驱动和游戏手柄功能正常。");
+            this.StopAttempt("方向输入提交失败，已立即停止移动。");
             this.ReportStatus(this.status, true);
             return;
         }
@@ -664,6 +691,120 @@ internal sealed class Runtime : IDisposable
 
     private unsafe bool StartMovementOverride(out string error)
     {
+        try
+        {
+            this.readWalkInputHook ??=
+                GameInteropProvider.HookFromSignature<ReadWalkInputDelegate>(
+                    ReadWalkInputSignature,
+                    this.ReadWalkInputDetour);
+            this.updatePlayerWalkSpeedHook ??=
+                GameInteropProvider.HookFromSignature<UpdatePlayerWalkSpeedDelegate>(
+                    UpdatePlayerWalkSpeedSignature,
+                    this.UpdatePlayerWalkSpeedDetour);
+            this.nativeMovementActive = true;
+            this.nativeDirectionDiagnosticPending = false;
+            this.nativeDirectionDiagnosticLogged = false;
+            this.speedOverrideApplied = false;
+            this.speedOverrideActive = true;
+            this.readWalkInputHook.Enable();
+            this.updatePlayerWalkSpeedHook.Enable();
+        }
+        catch (Exception exception)
+        {
+            this.nativeMovementActive = false;
+            this.readWalkInputHook?.Disable();
+            this.speedOverrideActive = false;
+            this.updatePlayerWalkSpeedHook?.Disable();
+            if (!this.StartVirtualGamepadFallback(out error))
+            {
+                error = $"原生移动方向 Hook 初始化失败（{exception.GetType().Name}），且旧移动方案不可用：{error}";
+                return false;
+            }
+        }
+        error = string.Empty;
+        return true;
+    }
+
+    private unsafe void ReadWalkInputDetour(
+        void* self,
+        float* sumLeft,
+        float* sumForward,
+        float* sumTurnLeft,
+        byte* haveBackwardOrStrafe,
+        byte* unknown,
+        byte additiveInput)
+    {
+        this.readWalkInputHook!.Original(
+            self,
+            sumLeft,
+            sumForward,
+            sumTurnLeft,
+            haveBackwardOrStrafe,
+            unknown,
+            additiveInput);
+
+        if (!this.nativeMovementActive
+            || additiveInput != 0
+            || sumLeft == null
+            || sumForward == null)
+            return;
+
+        var player = ObjectTable.LocalPlayer;
+        if (player == null)
+            return;
+
+        var desiredWorldAngle = MathF.Atan2(this.targetDirection.X, this.targetDirection.Y);
+        var legacyMode = GameConfig.TryGet(UiControlOption.MoveMode, out uint moveMode) && moveMode == 1;
+        float referenceAngle;
+        if (legacyMode)
+        {
+            var cameraManager = GameCameraManager.Instance();
+            var camera = cameraManager == null ? null : cameraManager->GetActiveCamera();
+            if (camera == null)
+                return;
+            referenceAngle = camera->DirH + MathF.PI;
+        }
+        else
+        {
+            referenceAngle = player.Rotation;
+        }
+
+        var relativeDirection = desiredWorldAngle - referenceAngle;
+        this.lastCameraReferenceDegrees = NormalizeDegrees(referenceAngle * (180f / MathF.PI));
+        *sumLeft = MathF.Sin(relativeDirection);
+        *sumForward = MathF.Cos(relativeDirection);
+        if (!this.nativeDirectionDiagnosticLogged)
+        {
+            this.lastInjectedLegacyMode = legacyMode;
+            this.lastInjectedWorldDegrees = NormalizeDegrees(desiredWorldAngle * (180f / MathF.PI));
+            this.lastInjectedReferenceDegrees = this.lastCameraReferenceDegrees;
+            this.lastInjectedRelativeDegrees = NormalizeSignedDegrees(relativeDirection * (180f / MathF.PI));
+            this.lastInjectedLeft = *sumLeft;
+            this.lastInjectedForward = *sumForward;
+            this.nativeDirectionDiagnosticPending = true;
+        }
+    }
+
+    private void FlushNativeDirectionDiagnostic()
+    {
+        if (!this.nativeDirectionDiagnosticPending || this.nativeDirectionDiagnosticLogged)
+            return;
+        this.nativeDirectionDiagnosticPending = false;
+        this.nativeDirectionDiagnosticLogged = true;
+        if (!this.configuration.DebugMode)
+            return;
+        Log.Information(
+            "[跳跳乐助手] 原生方向输入：模式 {Mode}；世界角 {World:F2}°；基准角 {Reference:F2}°；相对角 {Relative:+0.00;-0.00;0.00}°；Left {Left:+0.000;-0.000;0.000}；Forward {Forward:+0.000;-0.000;0.000}",
+            this.lastInjectedLegacyMode ? "传统" : "标准",
+            this.lastInjectedWorldDegrees,
+            this.lastInjectedReferenceDegrees,
+            this.lastInjectedRelativeDegrees,
+            this.lastInjectedLeft,
+            this.lastInjectedForward);
+    }
+
+    private unsafe bool StartVirtualGamepadFallback(out string error)
+    {
         if (!this.TryTemporarilyEnableGamepad(out error))
             return false;
         if (!this.TryInitializeVirtualGamepad(out error))
@@ -684,6 +825,7 @@ internal sealed class Runtime : IDisposable
         catch (Exception exception)
         {
             this.speedOverrideActive = false;
+            this.DisposeVirtualGamepad();
             this.RestoreGamepadMode();
             error = $"移动控制初始化失败：{exception.GetType().Name}；未执行跳跃。";
             return false;
@@ -692,13 +834,17 @@ internal sealed class Runtime : IDisposable
         {
             this.speedOverrideActive = false;
             this.updatePlayerWalkSpeedHook.Disable();
+            this.DisposeVirtualGamepad();
             this.RestoreGamepadMode();
-            error = "无法提交仅用于方向的虚拟 Xbox 左摇杆输入；请确认游戏内已启用手柄。";
+            error = "无法提交备用虚拟 Xbox 左摇杆输入。";
             return false;
         }
         error = string.Empty;
         return true;
     }
+
+    private bool TryApplyMovementDirection(float effectiveInputScale)
+        => this.nativeMovementActive || this.TryApplyVirtualMovement(effectiveInputScale);
 
     private unsafe void UpdatePlayerWalkSpeedDetour(PlayerMoveControllerWalk* controller)
     {
@@ -743,7 +889,8 @@ internal sealed class Runtime : IDisposable
     private void HandleTargetArrival(Vector3 playerPosition, float forwardProgress)
     {
         this.targetArrivalHandled = true;
-        this.NeutralizeVirtualGamepad();
+        this.nativeMovementActive = false;
+        this.DisposeVirtualGamepad();
         var forwardError = forwardProgress - this.attemptTargetDistance;
         var heightError = playerPosition.Y - this.target.Y;
         if (this.targetArrivalMode == TargetArrivalMode.ZeroHorizontalSpeed)
@@ -906,6 +1053,12 @@ internal sealed class Runtime : IDisposable
         return value < 0f ? value + 360f : value;
     }
 
+    private static float NormalizeSignedDegrees(float value)
+    {
+        value = NormalizeDegrees(value);
+        return value > 180f ? value - 360f : value;
+    }
+
     private unsafe bool TriggerJump()
     {
         var actionManager = ActionManager.Instance();
@@ -919,12 +1072,16 @@ internal sealed class Runtime : IDisposable
         if (this.speedOverrideActive)
             this.TryWriteCurrentSpeed(0f);
         this.speedOverrideActive = false;
+        this.nativeMovementActive = false;
+        this.nativeDirectionDiagnosticPending = false;
+        this.nativeDirectionDiagnosticLogged = false;
         this.speedOverrideApplied = false;
         this.walkControllerAddress = 0;
         this.targetArrivalHandled = false;
         this.attemptLandingAllowance = 0f;
         this.updatePlayerWalkSpeedHook?.Disable();
-        this.NeutralizeVirtualGamepad();
+        this.readWalkInputHook?.Disable();
+        this.DisposeVirtualGamepad();
         this.RestoreGamepadMode();
         this.state = AttemptState.Idle;
         this.status = message;
@@ -1841,7 +1998,7 @@ internal sealed class Runtime : IDisposable
         this.status = message;
         if (!this.configuration.DebugMode)
             return;
-        Log.Debug("[跳跳乐助手] {Message}", message);
+        Log.Information("[跳跳乐助手] {Message}", message);
         if (!notifyChat)
             return;
         ChatGui.Print(new XivChatEntry
@@ -2141,6 +2298,14 @@ internal sealed class Runtime : IDisposable
     private static extern short GetAsyncKeyState(int virtualKey);
 
     private unsafe delegate void UpdatePlayerWalkSpeedDelegate(PlayerMoveControllerWalk* controller);
+    private unsafe delegate void ReadWalkInputDelegate(
+        void* self,
+        float* sumLeft,
+        float* sumForward,
+        float* sumTurnLeft,
+        byte* haveBackwardOrStrafe,
+        byte* unknown,
+        byte additiveInput);
     private unsafe delegate void GetCameraPositionDelegate(
         GameCamera* camera,
         NativeGameObject* cameraTarget,

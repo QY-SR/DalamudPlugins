@@ -119,7 +119,7 @@ public sealed class Plugin : IDalamudPlugin
             "InventorySearch", "增强背包搜索", "1.5.3.0", "检索并整理保存的库存快照。", "/ebsearch：打开跨角色背包与收藏搜索窗口。\n/ebsearch refresh：立即刷新库存快照。",
             () => new SearchRuntime(this.context, this.configuration.InventorySearch), runtime => runtime.OpenWindow()));
         this.moduleHost.Register(new RuntimeModule<JumpRuntime>(
-            "JumpAssist", "跳跳乐助手", "3.5.3.0", "观察落点、预览轨迹并辅助执行跳跃。", "/jumpassist：打开设置。\n/jumpassist observe：进入观察选点。\n/jumpassist go：执行跳跃。\n/jumpassist clear：清除目标。",
+            "JumpAssist", "跳跳乐助手", "3.6.1.0", "观察落点、预览轨迹并辅助执行跳跃。", "/jumpassist：打开设置。\n/jumpassist observe：进入观察选点。\n/jumpassist go：执行跳跃。\n/jumpassist clear：清除目标。",
             () => new JumpRuntime(this.context, this.configuration.JumpAssist), runtime => runtime.OpenWindow()));
     }
 
